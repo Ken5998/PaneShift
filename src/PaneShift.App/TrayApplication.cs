@@ -24,13 +24,47 @@ public partial class App : System.Windows.Application
     private Forms.ContextMenuStrip? menu;
     private IReadOnlyList<HotkeyRegistrationFailure> failures = [];
     private bool paused;
+    private bool? isElevated;
+    private string? privilegeWarning;
+    private string? lastCommandFailure;
+    private string? restartDiagnostic;
+    private bool restartInProgress;
 
     public App() => windows = new WindowService(runtime);
 
     protected override void OnStartup(System.Windows.StartupEventArgs e)
     {
         base.OnStartup(e);
-        instance = new Mutex(true, @"Local\PaneShift", out ownsMutex);
+        RestartRequest? restart;
+        try
+        {
+            restart = RestartRequest.Parse(e.Args);
+            if (restart is not null)
+            {
+                ElevatedRestart.WaitForPreviousInstance(restart);
+                paused = restart.Paused;
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException or Win32Exception or InvalidOperationException or TimeoutException)
+        {
+            System.Windows.MessageBox.Show($"PaneShift could not complete the restart. {ex.Message}", "PaneShift");
+            Shutdown(1);
+            return;
+        }
+        try
+        {
+            instance = new Mutex(false, @"Local\PaneShift");
+            try { ownsMutex = instance.WaitOne(0); }
+            catch (AbandonedMutexException) { ownsMutex = true; }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            System.Windows.MessageBox.Show(
+                "PaneShift could not acquire its single-instance lock. It may already be running as administrator. " +
+                "Exit that instance before starting PaneShift normally.", "PaneShift");
+            Shutdown(1);
+            return;
+        }
         if (!ownsMutex)
         {
             System.Windows.MessageBox.Show("PaneShift is already running in the notification area.", "PaneShift");
@@ -39,7 +73,9 @@ public partial class App : System.Windows.Application
         }
         try
         {
-            settingsStore = new SettingsStore(Path.Combine(
+            try { isElevated = ProcessPrivileges.IsCurrentProcessElevated; }
+            catch (Win32Exception ex) { privilegeWarning = $"Could not query process elevation. Win32 error {ex.NativeErrorCode}: {ex.Message}"; }
+            settingsStore = new SettingsStore(restart?.SettingsFile ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PaneShift", "settings.json"));
             var loaded = settingsStore.LoadOrCreate();
             settingsWarning = loaded.Warning;
@@ -57,7 +93,7 @@ public partial class App : System.Windows.Application
             menu.Items.Add("Open Settings File", null, (_, _) => OpenSettingsFile());
             menu.Items.Add("Reload Settings", null, (_, _) => ReloadSettings());
             menu.Items.Add(new Forms.ToolStripSeparator());
-            var pause = new Forms.ToolStripMenuItem("Pause shortcuts") { CheckOnClick = true };
+            var pause = new Forms.ToolStripMenuItem("Pause shortcuts") { CheckOnClick = true, Checked = paused };
             pause.Click += (_, _) =>
             {
                 paused = pause.Checked;
@@ -68,17 +104,21 @@ public partial class App : System.Windows.Application
             };
             menu.Items.Add(pause);
             menu.Items.Add(new Forms.ToolStripSeparator());
+            if (isElevated == false)
+                menu.Items.Add("Restart as administrator...", null, (_, _) => RestartAsAdministrator());
+            else if (isElevated == true)
+                menu.Items.Add(new Forms.ToolStripMenuItem("Running as administrator") { Enabled = false });
             menu.Items.Add("Exit", null, (_, _) => Shutdown());
             applicationIcon = new ApplicationIcon();
             tray = new Forms.NotifyIcon
             {
                 Icon = applicationIcon.TrayIcon,
-                Text = "PaneShift",
+                Text = paused ? "PaneShift — paused" : "PaneShift",
                 ContextMenuStrip = menu,
                 Visible = true
             };
             tray.DoubleClick += (_, _) => ShowStatus();
-            RegisterShortcuts();
+            if (!paused) RegisterShortcuts();
             if (settingsWarning is not null) Notify(settingsWarning);
             if (applicationIcon.Warning is not null) Notify(applicationIcon.Warning);
         }
@@ -102,10 +142,14 @@ public partial class App : System.Windows.Application
         if (message != GlobalHotkeys.HotkeyMessage || paused || hotkeys is null ||
             !hotkeys.TryGetAction((int)wParam, out var action)) return 0;
         handled = true;
-        try { windows.Execute(action); }
-        catch (Exception ex) when (ex is Win32Exception or ArgumentException or NotSupportedException or OverflowException)
+        var failure = windows.Execute(action);
+        if (failure is not null)
         {
-            Notify($"{action} failed: {ex.Message}");
+            lastCommandFailure = $"{action}: {failure.Details}";
+            string notification = failure.Message;
+            if (failure.Kind == WindowFailureKind.AccessDenied && isElevated != false)
+                notification = "Windows denied access to this window. PaneShift cannot control this protected window with its current privileges.";
+            Notify(notification);
         }
         return 0;
     }
@@ -113,12 +157,17 @@ public partial class App : System.Windows.Application
     private void ShowStatus()
     {
         string text = paused ? "Shortcuts are paused.\n\n" : "PaneShift is running.\n\n";
+        text += $"Privilege level: {(isElevated is true ? "Administrator" : isElevated is false ? "Standard" : "Unknown")}\n\n";
         text += string.Join("\n", configuration.Hotkeys.Select(binding =>
             $"{FormatShortcut(binding)} — {binding.Action}"));
         if (failures.Count > 0)
             text += "\n\nRegistration failures:\n" + string.Join("\n", failures.Select(f =>
                 $"{FormatShortcut(f.Binding)} — {f.Binding.Action}: {f.Reason}"));
         if (settingsWarning is not null) text += "\n\n" + settingsWarning;
+        if (privilegeWarning is not null) text += "\n\n" + privilegeWarning;
+        if (lastCommandFailure is not null) text += "\n\nLast window command failure:\n" + lastCommandFailure;
+        if (restartDiagnostic is not null) text += "\n\nLast restart attempt:\n" + restartDiagnostic;
+        if (isElevated == true) text += "\n\nTo run normally again, choose Exit and launch PaneShift from a standard Explorer session.";
         if (applicationIcon?.Warning is { } iconWarning) text += "\n\n" + iconWarning;
         text += "\n\nActive settings:\n" + DescribeSettings();
         text += "\n\nAfter saving settings.json, choose Reload Settings from the tray.";
@@ -126,6 +175,29 @@ public partial class App : System.Windows.Application
     }
 
     private void Notify(string message) => tray?.ShowBalloonTip(6000, "PaneShift", message, Forms.ToolTipIcon.Warning);
+
+    private void RestartAsAdministrator()
+    {
+        if (restartInProgress || settingsStore is null || isElevated != false) return;
+        restartInProgress = true;
+        try
+        {
+            // Always restart our apphost, including when this instance was launched via dotnet run.
+            string executable = Path.Combine(AppContext.BaseDirectory, "PaneShift.App.exe");
+            var result = ElevatedRestart.Start(executable, settingsStore.FilePath, paused);
+            restartDiagnostic = result.Details;
+            if (result.Outcome == RestartOutcome.Started)
+            {
+                // OnExit releases hotkeys, icon and mutex. The replacement waits for process exit.
+                Shutdown();
+            }
+            else if (result.Outcome == RestartOutcome.Cancelled)
+                tray?.ShowBalloonTip(4000, "PaneShift", "Administrator restart cancelled. PaneShift is still running normally.", Forms.ToolTipIcon.Info);
+            else
+                Notify("Could not restart as administrator. PaneShift is still running. See Shortcuts and status for details.");
+        }
+        finally { restartInProgress = false; }
+    }
 
     private void ReloadSettings()
     {

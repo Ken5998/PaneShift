@@ -17,7 +17,7 @@ dotnet test PaneShift.sln -c Release --no-build
 dotnet run --project src/PaneShift.App
 ```
 
-The app starts in the notification area (possibly in its overflow menu), without a main window. Right-click the icon for **Shortcuts and status**, **Open Settings File**, **Reload Settings**, **Pause shortcuts**, or **Exit**. Pause releases registrations and resets command repetition; resume retries registrations. A second instance exits with a message. Exit unregisters hotkeys and removes the icon. Exit an older running copy before rebuilding or starting a new application version.
+The app starts in the notification area (possibly in its overflow menu), without a main window. Right-click the icon for **Shortcuts and status**, **Open Settings File**, **Reload Settings**, **Pause shortcuts**, **Restart as administrator...** (when standard), or **Exit**. Pause releases registrations and resets command repetition; resume retries registrations. A second instance exits with a message. Exit unregisters hotkeys and removes the icon. Exit an older running copy before rebuilding or starting a new application version.
 
 ## Default shortcuts
 
@@ -82,12 +82,31 @@ The generic transformation applies to all tiled layouts and repeated half sizes.
 
 PaneShift includes its finalized original artwork: `assets/paneshift.ico` is the authoritative Windows icon, and `assets/paneshift.png` is the high-resolution branding image used above. The ICO supplies the executable's native icon and is embedded as `PaneShift.Icon` for the central `ApplicationIcon` loader. Both built and published applications use embedded resources, with no dependency on a deployed source `assets` directory. The loader supplies the tray and a cached icon source for future WPF windows; a future installer should reference the same ICO. The defensive runtime fallback remains available if loading fails. See [assets/README.md](assets/README.md).
 
+## Elevated windows and administrator restart
+
+PaneShift runs as a standard-user application by default. Its manifest remains `asInvoker` with `uiAccess="false"`. Windows integrity levels/UIPI can prevent a standard process from controlling elevated windows such as Task Manager. Native error **5 / ERROR_ACCESS_DENIED** produces a friendly access-denied notification. It says the target *may* be elevated because that error alone does not prove the target's privilege level. Other native failures use a generic notification. **Shortcuts and status** retains the last failed action, native error code and diagnostic message, without a stack trace in notifications. Failed commands reset the half-action cycle.
+
+The status dialog shows **Privilege level: Standard** or **Administrator**, queried from the current process token using `OpenProcessToken` and `GetTokenInformation(TokenElevation)`. If that query fails, status shows **Unknown** and its diagnostic; administrator restart is not offered based on a guess. No target process token or memory is inspected.
+
+To control elevated windows, explicitly choose **Restart as administrator...** and accept the Windows UAC prompt. PaneShift uses `ProcessStartInfo` with `UseShellExecute = true` and `Verb = "runas"`; errors never trigger automatic elevation. Cancelling UAC keeps the existing app, registrations, pause state, settings, repetition and Restore history intact. Other launch failures also leave it running and expose details in status.
+
+The new process receives a private handoff argument containing the old PID and its UTC creation timestamp, the exact settings file path, and pause state. Before acquiring the single-instance mutex or registering hotkeys, it waits on the old process's exit with a bounded 30-second OS wait, without polling or a resident helper. The timestamp guards against PID reuse. The old process shuts down only after Shell launch succeeds, releasing hotkeys, tray resources and mutex through its normal exit lifecycle. If it does not exit within the bound, the new process reports the problem and exits without registering hotkeys. Mutex ownership is acquired with a single nonblocking attempt, including recovery from an abandoned mutex; the mere existence of a named mutex is not treated as a running instance. A separately launched third instance is still subject to this single-instance check.
+
+The handoff continues using the original `%LOCALAPPDATA%\PaneShift\settings.json` path, even if the UAC credentials identify another account. Reload and Open Settings File keep using that path for the new session. A real process restart reloads settings from disk and starts a new in-memory Restore history and repetition sequence; unlike Reload Settings, it cannot retain the old process's in-memory history. Pause state is carried over.
+
+When elevated, the tray shows **Running as administrator** and still provides **Exit**. **Restart normally** is intentionally deferred: a child of an elevated process may inherit elevation. Reliably returning to the original desktop user's context requires Explorer-mediated COM launch or additional token handling, which is outside this milestone. Choose **Exit**, then launch PaneShift from a standard Explorer session to run normally again. Launching a standard second copy while the elevated instance owns the mutex shows an explanatory message.
+
+No UAC, Windows security policy, message filter, keyboard hook, DLL injection or process-memory changes are used. Elevation does not guarantee access to every protected window.
+
+Windows references: [elevated/unelevated launch and the Explorer approach](https://devblogs.microsoft.com/oldnewthing/20131118-00/?p=2643), [TOKEN_ELEVATION](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-token_elevation), [ShellExecuteEx errors](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shellexecuteexw).
+
 ## Architecture
 
 - `PaneShift.Core` (`net10.0`): physical-pixel rectangles, pure geometry and gap transform, separate command repetition state and half-size strategy, action identifiers, hotkey/settings models, portable JSON file persistence, original window geometry history. `RuntimeSettings` owns the immutable active snapshot and the repetition state it resets when committing a valid candidate. No platform API calls.
-- `PaneShift.Windows` (`net10.0-windows`): Win32/DWM P/Invoke, foreground-window and monitor work-area retrieval, window placement, visible-frame compensation, and global hotkey lifecycle.
+- `PaneShift.Windows` (`net10.0-windows`): Win32/DWM P/Invoke, foreground-window and monitor work-area retrieval, window placement, visible-frame compensation, global hotkey lifecycle, command-failure translation, current-process elevation detection, and explicit restart handoff.
 - `PaneShift.App` (`net10.0-windows`): WPF lifecycle, message-only HWND, settings path/loading and Explorer integration, centralized icon loading. Windows Forms supplies only the notification icon and its menu. No external window-management dependencies.
 - `PaneShift.Core.Tests`: xUnit geometry, partition coverage, repetition/reset, gap adjacency, history, settings persistence/validation, runtime reload and shortcut tests.
+- `PaneShift.Windows.Tests`: deterministic tests for native-error classification, failure/reset behavior, restart arguments, launch configuration and UAC-cancellation mapping; no elevated target is required.
 
 `SettingsStore.LoadCandidate()` reads/deserializes/validates without changing live state. `RuntimeSettings.ReplaceCurrent()` commits a validated snapshot and resets repetition on the same UI thread that handles commands. `WindowService` reads that snapshot once per action and remains alive across reloads, preserving its native placement history. Candidate loading and commit remain separate so future hotkey preparation can be inserted before commit; persisted hotkeys are not implemented here.
 
@@ -103,7 +122,7 @@ Implemented: halves with repeated size cycling, corners, thirds, two thirds, six
 
 Almost Maximize, Maximize Height, Make Smaller/Larger, and Next/Previous Display have reserved action identifiers. Unsupported actions fail explicitly before window modification. Display transitions, lifecycle-aware history, configurable sequences, persisted hotkeys, a settings UI, and installer are deferred.
 
-PaneShift uses `RegisterHotKey` with `MOD_NOREPEAT`. It does not inject DLLs, access process memory, install keyboard hooks, or request elevation. This cannot guarantee compatibility with every game or anti-cheat system; use Pause when needed. Applications may enforce minimum sizes or reject placement, and elevated applications may be inaccessible. Native failures produce tray notifications. A successful positioning call does not guarantee that a target application accepted the exact size.
+PaneShift uses `RegisterHotKey` with `MOD_NOREPEAT`. It does not inject DLLs, access process memory, install keyboard hooks, or automatically request elevation. This cannot guarantee compatibility with every game or anti-cheat system; use Pause when needed. Applications may enforce minimum sizes or reject placement, and elevated applications may be inaccessible to the default standard instance. Native failures produce tray notifications. A successful positioning call does not guarantee that a target application accepted the exact size.
 
 API references: [RegisterHotKey](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerhotkey), [DWM window attributes](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute).
 
@@ -124,8 +143,32 @@ API references: [RegisterHotKey](https://learn.microsoft.com/en-us/windows/win32
 
 Automated tests validate geometry without controlling other desktop applications. Mixed-DPI, fullscreen/game compatibility, and real multi-monitor behavior require manual device testing.
 
+## Privilege and restart acceptance checks
+
+1. Run PaneShift normally; check **Privilege level: Standard** in status.
+2. Open Task Manager elevated.
+3. Invoke a PaneShift positioning shortcut on Task Manager.
+4. Verify a friendly Windows-access-denied notification, with error 5 and the failed action in status.
+5. Verify normal windows still respond and a failed command restarts the next half sequence at 1/2.
+6. Choose **Restart as administrator...**.
+7. Accept UAC manually.
+8. Verify exactly one PaneShift process/tray icon remains and status says **Administrator**, with no old-instance hotkey conflicts.
+9. Verify shortcuts now work on Task Manager where Windows permits them.
+10. Verify normal windows, gaps, sixth shortcuts, settings reload and pause/resume still work.
+11. Exit the elevated instance, launch normally, then request administrator restart and **cancel UAC**. Verify the same instance remains, shortcuts still work, and settings/Restore history are retained.
+12. Restart while paused and verify the new instance is paused. Confirm Open Settings File reveals the original JSON path. Where applicable, repeat with UAC credentials for a different administrator account.
+13. While elevated, launch another standard copy: verify a friendly single-instance message, no crash and no extra icon. Exit elevated PaneShift and start from standard Explorer to return to Standard.
+
+UAC acceptance/cancellation, integrity boundaries and the live single-instance handoff require manual Windows testing. The automated tests do not simulate Windows security with sleeps or timing assumptions.
+
 ## Validation of the settings reload milestone
 
 The Release build and framework-dependent publish completed without warnings or errors, and all 510 automated tests passed. The embedded ICO matches the approved asset; native icons extracted from both built and published executables were verified against it.
 
 Manual Windows testing confirmed that the PaneShift tray icon is displayed, Reload Settings applies changes successfully, and malformed JSON preserves the working active configuration. These checks do not replace the broader multi-monitor and DPI acceptance checks above.
+
+## Validation of the privilege and restart milestone
+
+The Release build completed without warnings or errors, and all 529 automated tests passed (510 Core tests and 19 Windows tests). The current-process elevation query was also exercised successfully in a standard-user process.
+
+Manual Windows testing of the privilege and restart milestone was confirmed successful by the maintainer. The acceptance checklist above remains available for regression testing; automated error-mapping tests do not substitute for real UAC and integrity-boundary checks.

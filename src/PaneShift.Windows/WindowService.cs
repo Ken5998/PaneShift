@@ -18,15 +18,8 @@ public sealed class WindowService
         this.runtime = runtime ?? new();
     }
 
-    public void Execute(WindowAction action)
-    {
-        try { ExecuteCore(action); }
-        catch
-        {
-            repetition.Reset();
-            throw;
-        }
-    }
+    public WindowCommandFailure? Execute(WindowAction action) =>
+        WindowCommandExecution.Execute(() => ExecuteCore(action), repetition);
 
     public void ResetRepetition() => repetition.Reset();
 
