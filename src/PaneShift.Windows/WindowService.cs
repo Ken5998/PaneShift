@@ -8,16 +8,38 @@ namespace PaneShift.Windows;
 public sealed class WindowService
 {
     private readonly WindowHistory history = new();
+    private readonly CommandRepetition repetition = new();
+    private readonly PaneShiftSettings settings;
     private readonly Dictionary<nint, SavedPlacement> placements = [];
     private sealed record SavedPlacement(uint ProcessId, uint ThreadId, NativeMethods.WindowPlacement Placement);
 
+    public WindowService(PaneShiftSettings? settings = null)
+    {
+        this.settings = settings ?? new();
+        this.settings.Validate();
+    }
+
     public void Execute(WindowAction action)
+    {
+        try { ExecuteCore(action); }
+        catch
+        {
+            repetition.Reset();
+            throw;
+        }
+    }
+
+    public void ResetRepetition() => repetition.Reset();
+
+    private void ExecuteCore(WindowAction action)
     {
         PruneHistory();
         nint hwnd = NativeMethods.GetForegroundWindow();
-        if (!CanManage(hwnd)) return;
+        if (!NativeMethods.IsWindow(hwnd) || !CanManage(hwnd)) { repetition.Reset(); return; }
         uint threadId = NativeMethods.GetWindowThreadProcessId(hwnd, out uint processId);
-        if (processId == Environment.ProcessId) return;
+        if (threadId == 0 || processId == Environment.ProcessId) { repetition.Reset(); return; }
+        int repeatIndex = repetition.Next(hwnd, action,
+            HalfActionCycle.AppliesTo(action) ? HalfActionCycle.Sizes.Count : 1);
         var placement = new NativeMethods.WindowPlacement { Length = Marshal.SizeOf<NativeMethods.WindowPlacement>() };
         Check(NativeMethods.GetWindowPlacement(hwnd, ref placement));
         if (action == WindowAction.Restore)
@@ -35,7 +57,11 @@ public sealed class WindowService
         PixelRect before = GetVisibleBounds(hwnd);
         // Validate support before touching the window or its history.
         PixelRect? tile = action is WindowAction.Maximize or WindowAction.Center
-            ? null : WindowGeometry.Calculate(action, work);
+            ? null : HalfActionCycle.AppliesTo(action)
+                ? WindowGeometry.CalculateHalf(action, work, HalfActionCycle.Sizes[repeatIndex])
+                : WindowGeometry.Calculate(action, work);
+        if (tile is { } ideal)
+            tile = WindowGaps.Apply(ideal, work, settings.GapPixels, settings.ApplyGapToScreenEdges);
         if (placements.TryAdd(hwnd, new(processId, threadId, placement)))
             history.Remember(hwnd, new(before, placement.ShowCommand == 3));
 
@@ -102,6 +128,7 @@ public sealed class WindowService
             {
                 placements.Remove(hwnd);
                 history.Forget(hwnd);
+                if (repetition.Target == hwnd) repetition.Reset();
             }
         }
     }

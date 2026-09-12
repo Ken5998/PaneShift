@@ -8,6 +8,8 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PaneShiftIconPath>$(MSBuildProjectDirectory)/../../assets/paneshift.ico</PaneShiftIconPath>
+    <ApplicationIcon Condition="Exists('$(PaneShiftIconPath)')">$(PaneShiftIconPath)</ApplicationIcon>
     <!-- WPF owns startup; NotifyIcon is the only Forms UI. The manifest must set DPI
          awareness before WPF creates any HWND, so the Forms startup advice does not apply. -->
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
@@ -16,5 +18,8 @@
   <ItemGroup>
     <ProjectReference Include="../PaneShift.Core/PaneShift.Core.csproj" />
     <ProjectReference Include="../PaneShift.Windows/PaneShift.Windows.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="Exists('$(PaneShiftIconPath)')">
+    <EmbeddedResource Include="$(PaneShiftIconPath)" LogicalName="PaneShift.Icon" />
   </ItemGroup>
 </Project>

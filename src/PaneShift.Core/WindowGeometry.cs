@@ -2,6 +2,28 @@ namespace PaneShift.Core;
 
 public static class WindowGeometry
 {
+    public static PixelRect CalculateHalf(WindowAction action, PixelRect workArea, HalfSize size)
+    {
+        if (!HalfActionCycle.AppliesTo(action))
+            throw new ArgumentException("A half action is required.", nameof(action));
+        if (size == HalfSize.Half) return Calculate(action, workArea);
+        var (start, end) = size switch
+        {
+            HalfSize.TwoThirds => (1, 2),
+            HalfSize.Third => (2, 1),
+            _ => throw new ArgumentOutOfRangeException(nameof(size))
+        };
+        int x1 = workArea.X, y1 = workArea.Y, x2 = workArea.Right, y2 = workArea.Bottom;
+        switch (action)
+        {
+            case WindowAction.LeftHalf: x2 = x1 + Boundary(workArea.Width, end, 3); break;
+            case WindowAction.RightHalf: x1 += Boundary(workArea.Width, start, 3); break;
+            case WindowAction.TopHalf: y2 = y1 + Boundary(workArea.Height, end, 3); break;
+            case WindowAction.BottomHalf: y1 += Boundary(workArea.Height, start, 3); break;
+        }
+        return new(x1, y1, x2 - x1, y2 - y1);
+    }
+
     public static PixelRect Calculate(WindowAction action, PixelRect workArea)
     {
         // Rational boundaries share the same rounding, so neighboring tiles meet exactly.

@@ -138,10 +138,22 @@ public class GeometryTests
     }
 
     [Fact]
-    public void DefaultsHaveSixteenUniqueShortcuts()
+    public void DefaultsHaveEighteenUniqueShortcuts()
     {
         var bindings = PaneShiftConfiguration.Default.Hotkeys;
-        Assert.Equal(16, bindings.Count);
-        Assert.Equal(16, bindings.Select(b => (b.Modifiers, b.VirtualKey)).Distinct().Count());
+        Assert.Equal(18, bindings.Count);
+        Assert.Equal(18, bindings.Select(b => (b.Modifiers, b.VirtualKey)).Distinct().Count());
+    }
+
+    [Fact]
+    public void RightSixthsUseControlShiftWindowsArrowBindings()
+    {
+        var bindings = PaneShiftConfiguration.Default.Hotkeys;
+        var modifiers = HotkeyModifiers.Control | HotkeyModifiers.Shift | HotkeyModifiers.Windows;
+        Assert.Equal(0x000Eu, (uint)modifiers);
+        Assert.Contains(new HotkeyBinding(modifiers, 0x26, WindowAction.TopRightSixth), bindings);
+        Assert.Contains(new HotkeyBinding(modifiers, 0x28, WindowAction.BottomRightSixth), bindings);
+        Assert.DoesNotContain(bindings, b => b.Action is WindowAction.TopLeftSixth or WindowAction.TopCenterSixth
+            or WindowAction.BottomLeftSixth or WindowAction.BottomCenterSixth);
     }
 }

@@ -16,7 +16,11 @@ public sealed record PaneShiftConfiguration(IReadOnlyList<HotkeyBinding> Hotkeys
         Bind('D', WindowAction.FirstThird), Bind('F', WindowAction.CenterThird),
         Bind('G', WindowAction.LastThird), Bind('E', WindowAction.FirstTwoThirds),
         Bind('R', WindowAction.CenterTwoThirds), Bind('T', WindowAction.LastTwoThirds),
-        Bind(0x0D, WindowAction.Maximize), Bind('C', WindowAction.Center)
+        Bind(0x0D, WindowAction.Maximize), Bind('C', WindowAction.Center),
+        new HotkeyBinding(HotkeyModifiers.Control | HotkeyModifiers.Shift | HotkeyModifiers.Windows,
+            0x26, WindowAction.TopRightSixth),
+        new HotkeyBinding(HotkeyModifiers.Control | HotkeyModifiers.Shift | HotkeyModifiers.Windows,
+            0x28, WindowAction.BottomRightSixth)
     }));
 
     private static HotkeyBinding Bind(uint key, WindowAction action) =>
