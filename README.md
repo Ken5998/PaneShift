@@ -83,10 +83,7 @@ PaneShift starts in the notification area, possibly inside its overflow menu. Ri
 
 **Apply** validates, saves and activates the draft without restarting. If a new hotkey is unavailable or saving fails, working settings and registrations remain active. **Cancel** discards edits; closing with unsaved changes prompts you first. No changes are written on every keystroke.
 
-<details>
-<summary>General settings: startup and runtime status</summary>
 <p><img src="docs/images/settings-general.png" alt="PaneShift General settings showing the start at sign-in checkbox, active shortcut status and standard privilege level" width="680" /></p>
-</details>
 
 Configuration is stored at:
 

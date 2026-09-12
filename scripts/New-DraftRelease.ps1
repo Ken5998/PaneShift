@@ -40,6 +40,13 @@ $generatedJson = & gh api --method POST "repos/$Repository/releases/generate-not
 if ($LASTEXITCODE -ne 0) { throw 'Could not generate release changelog.' }
 $generated = ($generatedJson | ConvertFrom-Json).body
 $notes += $generated
+if ($Version -eq '0.1.0') {
+    $initial = Get-Content (Join-Path $RepoRoot 'docs/RELEASE_NOTES_0.1.0.md') -Raw
+    # The generated security section remains authoritative for actual signing status.
+    $highlights = [regex]::Match($initial, '(?s)First public release.*?(?=## Downloads)').Value.Trim()
+    if (-not $highlights) { throw 'Initial release highlights are missing.' }
+    $notes = $notes.Replace("# PaneShift $tag", "# PaneShift $tag`n`n$highlights")
+}
 $notesPath = Join-Path $directory 'release-notes.md'
 $notes | Set-Content -LiteralPath $notesPath -Encoding utf8NoBOM
 $assets = @($expectedNames | ForEach-Object { Join-Path $directory $_ }) + (Join-Path $directory 'SHA256SUMS.txt')

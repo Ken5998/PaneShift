@@ -11,7 +11,7 @@ if ([string]::IsNullOrWhiteSpace($env:VT_API_KEY)) {
     $notes | Set-Content -LiteralPath $notesPath -Encoding utf8NoBOM
     return
 }
-$notes.Add('These artifacts were submitted as public samples. Reports are informational; false positives are possible.')
+$notes.Add('Successful submissions below are public samples. Reports are informational; false positives are possible.')
 $headers = @{ 'x-apikey' = $env:VT_API_KEY }
 $script:lastRequest = [DateTime]::MinValue
 function Invoke-VirusTotal([string] $Uri, [string] $Method = 'Get', [IO.FileInfo] $File) {
@@ -28,7 +28,8 @@ function Invoke-VirusTotal([string] $Uri, [string] $Method = 'Get', [IO.FileInfo
             if ($File) { $parameters.Form = @{ file = $File } }
             return Invoke-RestMethod @parameters
         } catch {
-            $status = if ($_.Exception.Response) { [int] $_.Exception.Response.StatusCode } else { 0 }
+            $responseProperty = $_.Exception.PSObject.Properties['Response']
+            $status = if ($responseProperty -and $responseProperty.Value) { [int] $responseProperty.Value.StatusCode } else { 0 }
             if ($status -eq 429 -and $attempt -lt 2) { Start-Sleep -Seconds 60; continue }
             # Never include request headers, the key, or raw exception details in logs.
             throw "VirusTotal request unavailable (HTTP $status)."
@@ -65,8 +66,11 @@ foreach ($name in @("PaneShift-$Version-Setup-x64.exe", "PaneShift-$Version-win-
         } catch { $notes.Add('  Analysis status unavailable; follow the report link later.') }
         $results.Add($result)
     } catch {
-        $notes.Add("- ${name}: submission unavailable. No clean-scan claim is made; retry manually if needed.")
-        Write-Warning "VirusTotal submission unavailable for $name. Release artifacts are unchanged."
+        # Only expose our own bounded diagnostics, never arbitrary exception text.
+        $reason = 'Local validation, network or response-format error.'
+        if ($_.Exception.Message -match '^VirusTotal request unavailable \(HTTP [0-9]{1,3}\)\.$') { $reason = $_.Exception.Message }
+        $notes.Add("- ${name}: submission unavailable. $reason No clean-scan claim is made; retry manually if needed.")
+        Write-Warning "VirusTotal submission unavailable for ${name}: $reason Release artifacts are unchanged."
     }
 }
 $results | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $directory 'virustotal-results.json') -Encoding utf8NoBOM
