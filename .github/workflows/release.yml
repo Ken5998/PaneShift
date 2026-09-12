@@ -1,0 +1,189 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read # SignPath build-origin verification; never used by PR CI.
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Validate release tag
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          . ./scripts/Release.Common.ps1
+          if (-not $env:RELEASE_TAG.StartsWith('v') -or $env:RELEASE_TAG.Length -le 1) { throw 'Expected v-prefixed semantic version tag.' }
+          $version = Get-ReleaseVersion $env:RELEASE_TAG.Substring(1)
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore PaneShift.sln
+      - name: Build
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: dotnet build PaneShift.sln -c Release --no-restore "-p:Version=$env:RELEASE_VERSION"
+      - run: dotnet test PaneShift.sln -c Release --no-build --no-restore
+      - run: ./scripts/Test-ReleaseScripts.ps1
+      - name: Publish win-x64
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: ./scripts/Publish-Release.ps1 -Version $env:RELEASE_VERSION
+      - name: Check optional signing configuration
+        id: signing
+        env:
+          ENABLED: ${{ vars.SIGNPATH_ENABLED }}
+          API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          ORGANIZATION: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          PROJECT: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          POLICY: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          APP_CONFIG: ${{ vars.SIGNPATH_APP_ARTIFACT_SLUG }}
+          INSTALLER_CONFIG: ${{ vars.SIGNPATH_INSTALLER_ARTIFACT_SLUG }}
+        run: |
+          $enabled = $env:ENABLED -eq 'true'
+          if ($enabled) {
+            foreach ($value in @($env:API_TOKEN, $env:ORGANIZATION, $env:PROJECT, $env:POLICY, $env:APP_CONFIG, $env:INSTALLER_CONFIG)) {
+              if ([string]::IsNullOrWhiteSpace($value)) { throw 'Signing enabled but configuration is incomplete. See docs/CODE_SIGNING.md.' }
+            }
+          }
+          "enabled=$($enabled.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+      - name: Upload application for signing
+        if: steps.signing.outputs.enabled == 'true'
+        id: unsigned-app
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: unsigned-application
+          path: artifacts/portable/PaneShift-${{ steps.version.outputs.version }}-win-x64/PaneShift.App.exe
+          if-no-files-found: error
+          retention-days: 1
+      - name: Sign application with SignPath
+        if: steps.signing.outputs.enabled == 'true'
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_APP_ARTIFACT_SLUG }}
+          github-artifact-id: ${{ steps.unsigned-app.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: artifacts/signed-app
+      - name: Verify and stage signed application
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          . ./scripts/Release.Common.ps1
+          $signed = 'artifacts/signed-app/PaneShift.App.exe'
+          Assert-Authenticode $signed
+          Copy-Item -LiteralPath $signed -Destination (Join-Path (Get-PublishDirectory $env:RELEASE_VERSION) 'PaneShift.App.exe') -Force
+      - name: Install pinned Inno Setup compiler
+        run: |
+          $iscc = ./scripts/Install-InnoSetup.ps1
+          "ISCC_PATH=$iscc" >> $env:GITHUB_ENV
+      - name: Package signed application or unsigned preview
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: ./scripts/Package-Release.ps1 -Version $env:RELEASE_VERSION
+      - name: Upload installer for signing
+        if: steps.signing.outputs.enabled == 'true'
+        id: unsigned-installer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: unsigned-installer
+          path: artifacts/installer/PaneShift-${{ steps.version.outputs.version }}-Setup-x64.exe
+          if-no-files-found: error
+          retention-days: 1
+      - name: Sign installer with SignPath
+        if: steps.signing.outputs.enabled == 'true'
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_INSTALLER_ARTIFACT_SLUG }}
+          github-artifact-id: ${{ steps.unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: artifacts/signed-installer
+      - name: Stage signed installer
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          . ./scripts/Release.Common.ps1
+          $signed = "artifacts/signed-installer/PaneShift-$env:RELEASE_VERSION-Setup-x64.exe"
+          Assert-Authenticode $signed
+          Copy-Item -LiteralPath $signed -Destination 'artifacts/installer' -Force
+      - name: Verify final artifacts and generate SHA-256 checksums
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          SIGNED: ${{ steps.signing.outputs.enabled }}
+        run: ./scripts/Verify-Release.ps1 -Version $env:RELEASE_VERSION -RequireSigned:($env:SIGNED -eq 'true')
+      - name: Stage exact release assets
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          New-Item -ItemType Directory artifacts/release | Out-Null
+          Copy-Item "artifacts/portable/PaneShift-$env:RELEASE_VERSION-win-x64.zip" artifacts/release
+          Copy-Item "artifacts/installer/PaneShift-$env:RELEASE_VERSION-Setup-x64.exe" artifacts/release
+          Copy-Item artifacts/SHA256SUMS.txt, artifacts/signing-status.txt artifacts/release
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-assets
+          path: artifacts/release/*
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
+  release:
+    needs: package
+    runs-on: windows-2025
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+          path: artifacts/release
+      - name: Create draft and upload verified assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.package.outputs.version }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: ./scripts/New-DraftRelease.ps1 -Version $env:RELEASE_VERSION -Repository $env:RELEASE_REPOSITORY
+      - name: Optional public VirusTotal submissions and release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+          RELEASE_VERSION: ${{ needs.package.outputs.version }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          ./scripts/Submit-VirusTotal.ps1 -Version $env:RELEASE_VERSION
+          Get-Content artifacts/release/virustotal.md | Add-Content artifacts/release/release-notes.md
+          gh release edit "v$env:RELEASE_VERSION" --repo $env:RELEASE_REPOSITORY --notes-file artifacts/release/release-notes.md
+          if ($LASTEXITCODE -ne 0) { throw 'Could not update draft notes.' }
+          'Release remains a draft. Complete manual acceptance, then publish it in GitHub.' >> $env:GITHUB_STEP_SUMMARY

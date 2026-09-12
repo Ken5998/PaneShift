@@ -17,6 +17,7 @@ public partial class App : System.Windows.Application
     private string? settingsWarning;
     private ConfigurationActivation? activation;
     private SettingsWindow? settingsWindow;
+    private LoginStartupViewModel? loginStartup;
     private Mutex? instance;
     private bool ownsMutex;
     private HwndSource? source;
@@ -77,6 +78,14 @@ public partial class App : System.Windows.Application
         {
             try { isElevated = ProcessPrivileges.IsCurrentProcessElevated; }
             catch (Win32Exception ex) { privilegeWarning = $"Could not query process elevation. Win32 error {ex.NativeErrorCode}: {ex.Message}"; }
+            string startupExecutable = Path.Combine(AppContext.BaseDirectory, "PaneShift.App.exe");
+            string? startupUnavailable = isElevated != false
+                ? "Change startup from a standard (non-administrator) PaneShift instance for your account."
+                : !File.Exists(startupExecutable) ? "Run an installed or extracted PaneShift executable to configure startup." : null;
+#if DEBUG
+            startupUnavailable = "Startup is unavailable in Debug builds. Use the installed or published Release application.";
+#endif
+            loginStartup = new LoginStartupViewModel(new LoginStartup(new RegistryLoginStartupStore(), startupExecutable, startupUnavailable));
             settingsStore = new SettingsStore(restart?.SettingsFile ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PaneShift", "settings.json"));
             var loaded = settingsStore.LoadOrCreate();
@@ -109,6 +118,22 @@ public partial class App : System.Windows.Application
                 RefreshSettingsStatus();
             };
             menu.Items.Add(pause);
+            var startupItem = new Forms.ToolStripMenuItem("Start PaneShift when I sign in");
+            void RefreshStartupItem()
+            {
+                startupItem.Checked = loginStartup.IsEnabled;
+                startupItem.Enabled = loginStartup.CanChange;
+                startupItem.ToolTipText = loginStartup.Description;
+            }
+            loginStartup.PropertyChanged += (_, _) => RefreshStartupItem();
+            menu.Opening += (_, _) => loginStartup.Refresh();
+            startupItem.Click += (_, _) =>
+            {
+                loginStartup.IsEnabled = !loginStartup.IsEnabled;
+                if (loginStartup.Error.Length > 0) Notify(loginStartup.Error);
+            };
+            RefreshStartupItem();
+            menu.Items.Add(startupItem);
             menu.Items.Add(new Forms.ToolStripSeparator());
             if (isElevated == false)
                 menu.Items.Add("Restart as administrator...", null, (_, _) => RestartAsAdministrator());
@@ -230,7 +255,8 @@ public partial class App : System.Windows.Application
     {
         if (settingsWindow is null)
         {
-            var model = new SettingsViewModel(runtime.Current, ApplySettings);
+            loginStartup?.Refresh();
+            var model = new SettingsViewModel(runtime.Current, ApplySettings, loginStartup);
             settingsWindow = new SettingsWindow(model, applicationIcon!.WindowIcon, settingsStore!.FilePath, isElevated,
                 () => OpenPath(settingsStore.FilePath), () => OpenPath(Path.GetDirectoryName(settingsStore.FilePath)!),
                 () => OpenPath("https://github.com/Ken5998/PaneShift"), RestartAsAdministrator);

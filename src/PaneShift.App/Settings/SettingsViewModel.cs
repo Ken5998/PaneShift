@@ -32,6 +32,7 @@ public sealed class SettingsViewModel : ObservableObject
     public IReadOnlyList<ShortcutRow> Rows { get; }
     public ObservableCollection<ShortcutGroup> Groups { get; }
     public RelayCommand ApplyCommand { get; }
+    public LoginStartupViewModel? LoginStartup { get; }
     public string GapText { get => gapText; set { gapText = value; Edited(); Changed(nameof(GapValue)); } }
     public double GapValue { get => int.TryParse(gapText, out int n) ? Math.Clamp(n, 0, 64) : 0; set => GapText = ((int)value).ToString(CultureInfo.InvariantCulture); }
     public bool ApplyGapToScreenEdges { get => edges; set { edges = value; Edited(); } }
@@ -42,9 +43,10 @@ public sealed class SettingsViewModel : ObservableObject
     public bool CanApply => HasChanges && validation.Length == 0 && !HasExternalChange;
     public string RuntimeStatus { get => status; set { status = value; Changed(); } }
 
-    public SettingsViewModel(PaneShiftSettings current, Func<PaneShiftSettings, string?> apply)
+    public SettingsViewModel(PaneShiftSettings current, Func<PaneShiftSettings, string?> apply, LoginStartupViewModel? loginStartup = null)
     {
         this.apply = apply;
+        LoginStartup = loginStartup;
         baseline = current;
         Rows = ActionCatalog.All.Select(a => new ShortcutRow(a)).ToArray();
         Groups = new(Rows.GroupBy(r => r.Definition.Group).Select(g => new ShortcutGroup(g.Key, g.ToArray())));

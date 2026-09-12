@@ -1,0 +1,31 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore PaneShift.sln
+      - run: dotnet build PaneShift.sln -c Release --no-restore
+      - run: dotnet test PaneShift.sln -c Release --no-build --no-restore
+      - name: Validate release scripts
+        run: ./scripts/Test-ReleaseScripts.ps1
+      - name: Verify unsigned production publish
+        run: ./scripts/Publish-Release.ps1

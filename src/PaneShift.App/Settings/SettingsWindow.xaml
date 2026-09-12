@@ -112,6 +112,13 @@
             </TabItem>
             <TabItem Header="_General">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,8,12,0"><StackPanel>
+                    <Border Style="{StaticResource Card}" DataContext="{Binding LoginStartup}"><StackPanel>
+                        <TextBlock Text="Startup" Style="{StaticResource Heading}"/>
+                        <CheckBox Content="Start PaneShift when I sign _in" IsChecked="{Binding IsEnabled, Mode=OneWay}" Command="{Binding ToggleCommand}" IsEnabled="{Binding CanChange}" AutomationProperties.Name="Start PaneShift when I sign in"/>
+                        <TextBlock Text="Changes immediately · shared with the tray menu" Foreground="{DynamicResource MutedBrush}" Margin="22,8,0,8"/>
+                        <TextBlock Text="{Binding Description}" Foreground="{DynamicResource MutedBrush}"/>
+                        <TextBlock Text="{Binding Error}" Foreground="{DynamicResource ErrorBrush}" Margin="0,8,0,0"/>
+                    </StackPanel></Border>
                     <Border Style="{StaticResource Card}"><StackPanel>
                         <TextBlock Text="Runtime" Style="{StaticResource Heading}"/>
                         <TextBlock Text="{Binding RuntimeStatus}" Margin="0,0,0,12"/>

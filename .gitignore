@@ -3,3 +3,7 @@
 .vs/
 TestResults/
 *.user
+artifacts/
+*.pfx
+*.p12
+*.key

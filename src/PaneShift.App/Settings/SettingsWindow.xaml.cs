@@ -21,9 +21,11 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         SettingsTheme.Apply(this);
         DataContext = model;
+        Activated += (_, _) => ViewModel.LoginStartup?.Refresh();
         Icon = BrandIcon.Source = icon;
         ConfigPath.Text = path;
-        VersionLabel.Text = $"Version {typeof(SettingsWindow).Assembly.GetName().Version?.ToString(3)} · MIT License";
+        var version = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(SettingsWindow).Assembly)?.InformationalVersion;
+        VersionLabel.Text = $"Version {version} · MIT License";
         ElevateButton.Visibility = elevated == false ? Visibility.Visible : Visibility.Collapsed;
         ElevationHint.Text = elevated == true
             ? "To run normally again, Exit PaneShift and launch it from a standard Explorer session."
