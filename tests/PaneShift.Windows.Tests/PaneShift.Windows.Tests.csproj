@@ -9,5 +9,6 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
     <Using Include="Xunit" />
     <ProjectReference Include="../../src/PaneShift.Windows/PaneShift.Windows.csproj" />
+    <ProjectReference Include="../../src/PaneShift.App/PaneShift.App.csproj" />
   </ItemGroup>
 </Project>

@@ -6,7 +6,7 @@ namespace PaneShift.Core;
 public sealed record SettingsLoadResult(PaneShiftSettings Settings, string? Warning = null);
 public sealed record SettingsCandidateResult(PaneShiftSettings? Settings, string? Error = null);
 
-/// <summary>Reads on demand. Existing files, including malformed files, are never overwritten.</summary>
+/// <summary>Reads on demand without rewriting files. Explicit Save atomically replaces validated settings.</summary>
 public sealed class SettingsStore(string filePath)
 {
     public string FilePath { get; } = Path.GetFullPath(filePath);
@@ -49,6 +49,28 @@ public sealed class SettingsStore(string filePath)
         {
             return new(null, $"Could not reload {FilePath}. Existing settings remain active. {ex.Message}");
         }
+    }
+
+    public void Save(PaneShiftSettings settings)
+    {
+        settings.Validate();
+        var canonical = settings with { Hotkeys = HotkeySettings.ToMap(HotkeySettings.Resolve(settings)) };
+        string json = JsonSerializer.Serialize(canonical, JsonOptions) + Environment.NewLine;
+        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+        string temporary = FilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                using var writer = new StreamWriter(stream, leaveOpen: true);
+                writer.Write(json);
+                writer.Flush();
+                stream.Flush(flushToDisk: true);
+            }
+            if (File.Exists(FilePath)) File.Replace(temporary, FilePath, null);
+            else File.Move(temporary, FilePath);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
     private PaneShiftSettings ReadValidated()

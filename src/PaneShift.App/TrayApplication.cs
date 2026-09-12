@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows.Interop;
 using PaneShift.Core;
 using PaneShift.Windows;
+using PaneShift.App.Settings;
 using Forms = System.Windows.Forms;
 
 namespace PaneShift.App;
@@ -14,7 +15,8 @@ public partial class App : System.Windows.Application
     private readonly WindowService windows;
     private SettingsStore? settingsStore;
     private string? settingsWarning;
-    private readonly PaneShiftConfiguration configuration = PaneShiftConfiguration.Default;
+    private ConfigurationActivation? activation;
+    private SettingsWindow? settingsWindow;
     private Mutex? instance;
     private bool ownsMutex;
     private HwndSource? source;
@@ -86,9 +88,12 @@ public partial class App : System.Windows.Application
                 WindowStyle = 0
             });
             source.AddHook(OnMessage);
+            hotkeys = new GlobalHotkeys(source.Handle);
+            activation = new ConfigurationActivation(runtime, settingsStore, hotkeys);
             menu = new Forms.ContextMenuStrip();
             menu.Items.Add(new Forms.ToolStripMenuItem("PaneShift") { Enabled = false });
             menu.Items.Add(new Forms.ToolStripSeparator());
+            menu.Items.Add("Settings...", null, (_, _) => OpenSettings());
             menu.Items.Add("Shortcuts and status", null, (_, _) => ShowStatus());
             menu.Items.Add("Open Settings File", null, (_, _) => OpenSettingsFile());
             menu.Items.Add("Reload Settings", null, (_, _) => ReloadSettings());
@@ -98,9 +103,10 @@ public partial class App : System.Windows.Application
             {
                 paused = pause.Checked;
                 windows.ResetRepetition();
-                if (paused) { hotkeys?.Dispose(); hotkeys = null; }
+                if (paused) hotkeys?.ReleaseAll();
                 else RegisterShortcuts();
                 if (tray is not null) tray.Text = paused ? "PaneShift — paused" : "PaneShift";
+                RefreshSettingsStatus();
             };
             menu.Items.Add(pause);
             menu.Items.Add(new Forms.ToolStripSeparator());
@@ -108,7 +114,7 @@ public partial class App : System.Windows.Application
                 menu.Items.Add("Restart as administrator...", null, (_, _) => RestartAsAdministrator());
             else if (isElevated == true)
                 menu.Items.Add(new Forms.ToolStripMenuItem("Running as administrator") { Enabled = false });
-            menu.Items.Add("Exit", null, (_, _) => Shutdown());
+            menu.Items.Add("Exit", null, (_, _) => ExitFromTray());
             applicationIcon = new ApplicationIcon();
             tray = new Forms.NotifyIcon
             {
@@ -117,7 +123,7 @@ public partial class App : System.Windows.Application
                 ContextMenuStrip = menu,
                 Visible = true
             };
-            tray.DoubleClick += (_, _) => ShowStatus();
+            tray.DoubleClick += (_, _) => OpenSettings();
             if (!paused) RegisterShortcuts();
             if (settingsWarning is not null) Notify(settingsWarning);
             if (applicationIcon.Warning is not null) Notify(applicationIcon.Warning);
@@ -131,8 +137,7 @@ public partial class App : System.Windows.Application
 
     private void RegisterShortcuts()
     {
-        hotkeys = new GlobalHotkeys(source!.Handle);
-        failures = hotkeys.Register(configuration.Hotkeys);
+        failures = hotkeys!.Register(HotkeySettings.Resolve(runtime.Current));
         if (failures.Count > 0)
             Notify($"{failures.Count} shortcut(s) could not be registered. Open Shortcuts and status for details.");
     }
@@ -140,8 +145,10 @@ public partial class App : System.Windows.Application
     private nint OnMessage(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
     {
         if (message != GlobalHotkeys.HotkeyMessage || paused || hotkeys is null ||
-            !hotkeys.TryGetAction((int)wParam, out var action)) return 0;
+            !hotkeys.TryGetBinding((int)wParam, out var binding) || binding is null) return 0;
         handled = true;
+        if (settingsWindow?.TryRecordHotkey(binding) == true) return 0;
+        var action = binding.Action;
         var failure = windows.Execute(action);
         if (failure is not null)
         {
@@ -158,12 +165,13 @@ public partial class App : System.Windows.Application
     {
         string text = paused ? "Shortcuts are paused.\n\n" : "PaneShift is running.\n\n";
         text += $"Privilege level: {(isElevated is true ? "Administrator" : isElevated is false ? "Standard" : "Unknown")}\n\n";
-        text += string.Join("\n", configuration.Hotkeys.Select(binding =>
+        text += string.Join("\n", HotkeySettings.Resolve(runtime.Current).Select(binding =>
             $"{FormatShortcut(binding)} — {binding.Action}"));
         if (failures.Count > 0)
             text += "\n\nRegistration failures:\n" + string.Join("\n", failures.Select(f =>
                 $"{FormatShortcut(f.Binding)} — {f.Binding.Action}: {f.Reason}"));
         if (settingsWarning is not null) text += "\n\n" + settingsWarning;
+        if (hotkeys?.CleanupWarning is { } cleanup) text += "\n\n" + cleanup;
         if (privilegeWarning is not null) text += "\n\n" + privilegeWarning;
         if (lastCommandFailure is not null) text += "\n\nLast window command failure:\n" + lastCommandFailure;
         if (restartDiagnostic is not null) text += "\n\nLast restart attempt:\n" + restartDiagnostic;
@@ -179,6 +187,7 @@ public partial class App : System.Windows.Application
     private void RestartAsAdministrator()
     {
         if (restartInProgress || settingsStore is null || isElevated != false) return;
+        if (settingsWindow?.ConfirmPendingChanges() == false) return;
         restartInProgress = true;
         try
         {
@@ -189,6 +198,7 @@ public partial class App : System.Windows.Application
             if (result.Outcome == RestartOutcome.Started)
             {
                 // OnExit releases hotkeys, icon and mutex. The replacement waits for process exit.
+                settingsWindow?.CloseForExit();
                 Shutdown();
             }
             else if (result.Outcome == RestartOutcome.Cancelled)
@@ -201,8 +211,8 @@ public partial class App : System.Windows.Application
 
     private void ReloadSettings()
     {
-        if (settingsStore is null) return;
-        settingsWarning = runtime.Reload(settingsStore);
+        if (activation is null) return;
+        settingsWarning = activation.Reload(paused);
         if (settingsWarning is not null)
         {
             tray?.ShowBalloonTip(6000, "PaneShift — Settings reload failed",
@@ -210,7 +220,58 @@ public partial class App : System.Windows.Application
                 Forms.ToolTipIcon.Error);
             return;
         }
+        failures = [];
+        settingsWindow?.ViewModel.ExternalReload(runtime.Current);
+        RefreshSettingsStatus();
         tray?.ShowBalloonTip(4000, "PaneShift — Settings reloaded", DescribeSettings(), Forms.ToolTipIcon.Info);
+    }
+
+    private void OpenSettings()
+    {
+        if (settingsWindow is null)
+        {
+            var model = new SettingsViewModel(runtime.Current, ApplySettings);
+            settingsWindow = new SettingsWindow(model, applicationIcon!.WindowIcon, settingsStore!.FilePath, isElevated,
+                () => OpenPath(settingsStore.FilePath), () => OpenPath(Path.GetDirectoryName(settingsStore.FilePath)!),
+                () => OpenPath("https://github.com/Ken5998/PaneShift"), RestartAsAdministrator);
+            settingsWindow.Closed += (_, _) => settingsWindow = null;
+            RefreshSettingsStatus();
+            settingsWindow.Show();
+        }
+        if (settingsWindow.WindowState == System.Windows.WindowState.Minimized)
+            settingsWindow.WindowState = System.Windows.WindowState.Normal;
+        settingsWindow.Activate();
+    }
+
+    private string? ApplySettings(PaneShiftSettings candidate)
+    {
+        var error = activation!.Apply(candidate, persist: true, paused);
+        if (error is null) { settingsWarning = null; failures = []; }
+        RefreshSettingsStatus();
+        return error;
+    }
+
+    private void RefreshSettingsStatus()
+    {
+        if (settingsWindow is null) return;
+        settingsWindow.ViewModel.RuntimeStatus =
+            $"Shortcut status: {(paused ? "Paused" : "Active")}\nPrivilege level: {(isElevated is true ? "Administrator" : isElevated is false ? "Standard" : "Unknown")}" +
+            (failures.Count > 0 ? $"\n{failures.Count} shortcut(s) unavailable. See Shortcuts and status in the tray." : "") +
+            (hotkeys?.CleanupWarning is { } warning ? $"\n{warning}" : "");
+    }
+
+    private void ExitFromTray()
+    {
+        if (settingsWindow?.ConfirmPendingChanges() == false) return;
+        settingsWindow?.CloseForExit();
+        Shutdown();
+    }
+
+    private void OpenPath(string path)
+    {
+        try { using var process = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
+        { Notify($"Could not open {path}: {ex.Message}"); }
     }
 
     private string DescribeSettings()

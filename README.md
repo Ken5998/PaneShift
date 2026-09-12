@@ -19,7 +19,23 @@ dotnet run --project src/PaneShift.App
 
 The app starts in the notification area (possibly in its overflow menu), without a main window. Right-click the icon for **Shortcuts and status**, **Open Settings File**, **Reload Settings**, **Pause shortcuts**, **Restart as administrator...** (when standard), or **Exit**. Pause releases registrations and resets command repetition; resume retries registrations. A second instance exits with a message. Exit unregisters hotkeys and removes the icon. Exit an older running copy before rebuilding or starting a new application version.
 
-## Default shortcuts
+Open **Settings...** near the top of the tray menu, or double-click the icon. Opening it again activates the same native WPF window. Closing Settings leaves PaneShift running; startup remains tray-only.
+
+## Settings window
+
+- **Shortcuts:** all 23 implemented actions, grouped with original placement glyphs. Click a field (or focus it and press Space), then press Ctrl, Alt, Shift and/or Win with a key. Escape cancels recording; Tab moves on. **Clear** disables that shortcut. Duplicates block Apply and name the affected actions. **Reset shortcuts to defaults** only changes the draft.
+- **Layout:** gap in physical pixels, a 0–64 px slider, screen-edge spacing, and a lightweight preview. Direct input preserves the backend's nonnegative integer range; the illustrative preview caps spacing at 64 px. Repeated halves retain **Cycle sizes: 1/2 → 2/3 → 1/3**.
+- **General:** shortcut/privilege status, configuration file/folder, administrator restart, version, MIT license, GitHub, and **Restore defaults...**. Automatic sign-in startup remains deferred.
+
+Edits remain a draft until **Apply** validates, saves and activates them. Success stays in the window with quiet feedback. **Cancel** discards edits and closes Settings. Closing with X, exiting from the tray, or requesting administrator restart prompts to apply, discard or keep editing when necessary. Restore defaults never deletes the JSON and requires Apply.
+
+The window selects Windows light/dark application colors (or high-contrast colors) when opened. Close and reopen it after changing Windows appearance; there is no background theme watcher. Keyboard navigation and visible focus indicators are available throughout.
+
+### Settings screenshots
+
+Screenshots of Shortcuts, Layout and General will be added after visual acceptance at 100%, 125% and 150% scaling in light and dark appearance.
+
+## Default shortcut mappings
 
 The following shortcuts use **Ctrl+Alt**.
 
@@ -41,11 +57,11 @@ Two additional shortcuts use **Ctrl+Shift+Win**:
 | Up | Top Right Sixth |
 | Down | Bottom Right Sixth |
 
-The four left/center sixth actions remain available through action identifiers and the code-supplied hotkey configuration, without default bindings. There are 18 default shortcuts in total.
+The four left/center sixth actions and Restore have no default bindings; assign them in Settings → Shortcuts. There are 18 default shortcuts, unchanged from earlier versions.
 
 Repeated half commands on the same target window cycle **1/2 → 2/3 → 1/3 → 1/2**, anchored to the requested left, right, top, or bottom edge. Each press must be released before repeating (`MOD_NOREPEAT`). There is no timing threshold. A different action or target HWND, Restore, an invalid target, a failed command, or pause resets the sequence. Target changes and validity are checked only when a command arrives; switching away and back without invoking a PaneShift command is not tracked.
 
-Registration conflicts appear in a tray notification and the status dialog. Successful registrations continue to work. Other applications or graphics drivers may reserve these combinations.
+Startup/resume registration conflicts appear in a tray notification and the status dialog; successful registrations continue to work. GUI Apply and explicit Reload are transactional: a conflict rejects the candidate and retains the previous active map. Other applications or graphics drivers may reserve combinations. The recorder uses WPF key events, including Alt SystemKey, without a keyboard hook. Already registered PaneShift chords are forwarded to the focused recorder. Combinations owned by another application may be intercepted before WPF receives them; they can also be tested through JSON and Reload. F12 is rejected because Windows reserves it for debugging.
 
 ## Settings and gaps
 
@@ -68,11 +84,22 @@ To apply changes without restarting:
 3. Save the file.
 4. Choose **Reload Settings** from the tray.
 
-The next positioning command uses the new configuration. Existing windows are not moved by reload. A successful reload resets the half-action cycle to 1/2 and preserves original Restore history, pause state, and hotkey registrations. The success notification and status dialog show active gap, screen-edge, and repetition settings. Reload is available while paused.
+The next positioning command uses the new configuration. Existing windows are not moved by Apply or Reload. Success resets the half-action cycle to 1/2, preserves original Restore history and pause state, and activates the new shortcut map. While paused, Apply/Reload briefly probes the complete candidate map, then releases registrations and stays paused; another application can still claim a chord before resume.
 
-There is no file watcher, polling, background timer, or settings window. Hotkey editing remains in `PaneShiftConfiguration`; the JSON currently controls gaps and the repetition strategy only. `cycleSizes` is the only implemented repetition strategy.
+The Settings window is the primary editor; the explicit JSON workflow remains supported. There is no file watcher, polling or background timer. `cycleSizes` is the only implemented repetition strategy. A successful external reload refreshes an open clean draft. If it has edits, the window preserves them and blocks Apply until you explicitly choose **Reload into this window** (with confirmation) or discard and reopen.
 
-Missing properties inherit defaults and unknown properties are ignored. On **runtime reload**, invalid JSON, negative gaps, unsupported repetition values, missing files, and file-access errors keep the current known-good configuration and repetition state completely unchanged. A concise failure notification appears; details remain in **Shortcuts and status** until a successful reload clears them. Reload never creates or rewrites the file. At **startup**, when no active configuration exists yet, load failures still use safe defaults and report a warning. Existing files, including malformed files, are never overwritten automatically.
+An optional `hotkeys` object maps stable, case-sensitive action IDs to chords. Missing/null sections use existing defaults; missing entries inherit that action's default, while a JSON `null` entry explicitly disables it. For example, add this property to bind Restore and disable Center:
+
+```json
+"hotkeys": {
+  "restore": "Ctrl+Alt+Backspace",
+  "center": null
+}
+```
+
+Modifier spelling is case-insensitive and normalized to `Ctrl+Alt+Shift+Win+Key` order. Apply writes the complete implemented action map in deterministic ordinal key order. Unknown/unimplemented action IDs, invalid chords and internal duplicates are rejected. Old JSON without `hotkeys` remains compatible; future actions can inherit defaults when their entries are missing.
+
+Missing properties inherit defaults and unknown top-level properties are ignored. On **runtime reload**, invalid JSON, negative gaps, unsupported repetition values, invalid/conflicting shortcuts, missing files and file-access errors keep the known-good configuration and repetition state unchanged. Details remain in **Shortcuts and status** until a successful reload clears them. Reload never creates or rewrites the file. At **startup**, load failures use safe defaults and report a warning. Existing files are never overwritten automatically; explicit GUI Apply replaces the file after validation and successful hotkey preparation.
 
 `gapPixels` is a nonnegative count of **physical pixels**, applied to the visible window frame after the ideal tile is calculated. Zero preserves the original ideal geometry. An internal leading edge receives `floor(gap/2)` inset and an internal trailing edge receives `ceil(gap/2)`: adjacent windows have exactly the configured gap, including odd values. There is no cumulative inset across commands. With `applyGapToScreenEdges: false`, outer edges stay flush with the work area; with `true`, outer edges receive the full gap. Taskbar space stays excluded.
 
@@ -80,7 +107,7 @@ The generic transformation applies to all tiled layouts and repeated half sizes.
 
 ## Icon asset
 
-PaneShift includes its finalized original artwork: `assets/paneshift.ico` is the authoritative Windows icon, and `assets/paneshift.png` is the high-resolution branding image used above. The ICO supplies the executable's native icon and is embedded as `PaneShift.Icon` for the central `ApplicationIcon` loader. Both built and published applications use embedded resources, with no dependency on a deployed source `assets` directory. The loader supplies the tray and a cached icon source for future WPF windows; a future installer should reference the same ICO. The defensive runtime fallback remains available if loading fails. See [assets/README.md](assets/README.md).
+PaneShift includes its finalized original artwork: `assets/paneshift.ico` is the authoritative Windows icon, and `assets/paneshift.png` is the high-resolution branding image used above. The ICO supplies the executable's native icon and is embedded as `PaneShift.Icon` for the central `ApplicationIcon` loader. Both built and published applications use embedded resources, with no dependency on a deployed source `assets` directory. The loader supplies the tray and a cached icon source for the Settings window; a future installer should reference the same ICO. The defensive runtime fallback remains available if loading fails. See [assets/README.md](assets/README.md).
 
 ## Elevated windows and administrator restart
 
@@ -108,7 +135,9 @@ Windows references: [elevated/unelevated launch and the Explorer approach](https
 - `PaneShift.Core.Tests`: xUnit geometry, partition coverage, repetition/reset, gap adjacency, history, settings persistence/validation, runtime reload and shortcut tests.
 - `PaneShift.Windows.Tests`: deterministic tests for native-error classification, failure/reset behavior, restart arguments, launch configuration and UAC-cancellation mapping; no elevated target is required.
 
-`SettingsStore.LoadCandidate()` reads/deserializes/validates without changing live state. `RuntimeSettings.ReplaceCurrent()` commits a validated snapshot and resets repetition on the same UI thread that handles commands. `WindowService` reads that snapshot once per action and remains alive across reloads, preserving its native placement history. Candidate loading and commit remain separate so future hotkey preparation can be inserted before commit; persisted hotkeys are not implemented here.
+`SettingsStore.LoadCandidate()` reads and validates without changing live state. `ConfigurationActivation` is the shared GUI Apply / explicit Reload pipeline. `GlobalHotkeys.Transition` keeps current chords reserved while acquiring every new chord, reuses reservations for action swaps, then runs the commit. GUI commit writes a flushed sibling temporary file and atomically replaces the JSON before swapping the runtime snapshot and dispatch map. A conflict or file error releases only newly acquired reservations; old working registrations, active settings and file remain intact. Reload uses the same transition without writing the file. Rare native unregister errors remain visible in status; unused retained reservations never dispatch an action. Startup and resume retain the existing partial-success policy because no working active registration map exists then.
+
+`RuntimeSettings.ReplaceCurrent()` commits on the message-window thread and resets repetition. `WindowService` stays alive, retaining Restore history. Core owns the catalog, chord codec and immutable settings; Windows owns native registration and the activation coordinator. App owns `SettingsViewModel`, the draft/validation state, `ShortcutRecorder`, lightweight WPF glyphs and `SettingsWindow`. The view calls application callbacks, never Win32. Windows Forms remains limited to the tray. No additional UI packages, hooks, watchers or timers are introduced.
 
 Layouts use rational boundaries relative to the active window's monitor **work area**, preserving taskbar space. Each integer boundary is `size * numerator / denominator`, with 64-bit intermediate arithmetic. Adjacent regions share boundaries, avoiding gaps at odd widths. Center Two Thirds spans 1/6 to 5/6. Rounding differences are at most one pixel. Degenerate zero-sized tiles are rejected.
 
@@ -120,13 +149,35 @@ Before the first modification, the service saves original geometry and native pl
 
 Implemented: halves with repeated size cycling, corners, thirds, two thirds, six sixths, generic pixel gaps, persisted JSON settings with explicit runtime reload, Maximize, Center, tray operation, 18 default global shortcuts, and finalized project artwork. Repetition state accepts a sequence length independently of geometry; the half-size strategy supplies the current sequence. Other strategies can be added separately without changing the state tracker.
 
-Almost Maximize, Maximize Height, Make Smaller/Larger, and Next/Previous Display have reserved action identifiers. Unsupported actions fail explicitly before window modification. Display transitions, lifecycle-aware history, configurable sequences, persisted hotkeys, a settings UI, and installer are deferred.
+Almost Maximize, Maximize Height, Make Smaller/Larger, and Next/Previous Display have reserved action identifiers and are not exposed in Settings. Unsupported actions fail before window modification. Display transitions, lifecycle-aware history, configurable sequences, automatic sign-in startup and an installer remain deferred. Native Settings and persisted configurable hotkeys are implemented.
 
 PaneShift uses `RegisterHotKey` with `MOD_NOREPEAT`. It does not inject DLLs, access process memory, install keyboard hooks, or automatically request elevation. This cannot guarantee compatibility with every game or anti-cheat system; use Pause when needed. Applications may enforce minimum sizes or reject placement, and elevated applications may be inaccessible to the default standard instance. Native failures produce tray notifications. A successful positioning call does not guarantee that a target application accepted the exact size.
 
 API references: [RegisterHotKey](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerhotkey), [DWM window attributes](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute).
 
 ## Manual acceptance checks
+
+### Settings GUI acceptance
+
+1. Open Settings from the tray; startup must remain tray-only.
+2. Double-click the tray icon again; verify the same window activates (including when minimized).
+3. Change gap from 0 to 12; verify the draft preview changes without changing live settings.
+4. Apply and immediately tile two windows.
+5. Verify 12 physical pixels between them without restarting; test screen-edge gaps too.
+6. Record a free combination for Left Half, including an Alt chord.
+7. Apply and verify quiet success feedback and persisted JSON.
+8. Verify the old shortcut no longer performs Left Half.
+9. Verify the new shortcut works immediately.
+10. Assign the same chord to two actions; verify Apply is disabled with both names shown.
+11. Try a chord owned by another application (via JSON if its owner intercepts recording); verify Apply/Reload failure keeps old working shortcuts and active layout. Failed GUI Apply must leave JSON unchanged.
+12. Clear a shortcut, Apply, and verify it becomes unbound.
+13. Reset shortcuts to defaults; verify this only changes the draft until Apply, then check both existing sixth defaults.
+14. Close Settings and confirm tray operation continues. With dirty edits, test X → Yes/No/Cancel and explicit Cancel. Escape should cancel recording without closing the window.
+15. Reopen Settings and confirm persisted values. Reload JSON with a clean draft, then a dirty draft; verify refresh vs. preserved edits and explicit reload confirmation. Test pause/resume and administrator restart with dirty edits.
+16. Test 100%, 125% and 150% scaling, minimum window size, scrolling, keyboard-only navigation and focus indicators. Verify Restore and all six sixth actions can be bound.
+17. Test light/dark Windows application appearance and high contrast, reopening Settings after each theme change.
+
+### Window management regression
 
 1. Start PaneShift, focus a resizable window, and exercise each default shortcut.
 2. Check neighboring thirds on an odd-width/ultrawide work area and taskbar clearance.
@@ -160,6 +211,14 @@ Automated tests validate geometry without controlling other desktop applications
 13. While elevated, launch another standard copy: verify a friendly single-instance message, no crash and no extra icon. Exit elevated PaneShift and start from standard Explorer to return to Standard.
 
 UAC acceptance/cancellation, integrity boundaries and the live single-instance handoff require manual Windows testing. The automated tests do not simulate Windows security with sleeps or timing assumptions.
+
+## Validation of the graphical Settings milestone
+
+The maintainer confirmed that the graphical Settings milestone works successfully in manual Windows testing. The acceptance checklist remains available for regression testing across devices and display configurations.
+
+Release build: zero warnings and errors. All **556 tests passed**: 523 Core and 33 Windows/App support tests. New coverage includes chord parsing/display, backward-compatible JSON, deterministic save/load, explicit disabling, duplicates, fake-backend transactional conflict rollback, disk failure, swaps, pause, and draft apply/reset/external-reload behavior. Tests do not depend on actual OS-global hotkey availability.
+
+Live Windows smoke checks covered the three pages in dark appearance, recording an already registered PaneShift chord, duplicate validation, gap draft editing, the unsaved-changes prompt and Cancel. The existing JSON remained unchanged. Final visual acceptance across scaling/themes, real external conflicts, live Apply-to-window geometry and elevation regression still require the manual checklist above.
 
 ## Validation of the settings reload milestone
 

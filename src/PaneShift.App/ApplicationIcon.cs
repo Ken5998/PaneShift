@@ -7,7 +7,7 @@ using System.Windows.Media.Imaging;
 
 namespace PaneShift.App;
 
-/// <summary>Owns one icon shared by the tray and future WPF windows.</summary>
+/// <summary>Owns one icon shared by the tray and WPF windows.</summary>
 internal sealed class ApplicationIcon : IDisposable
 {
     public Icon TrayIcon { get; }
