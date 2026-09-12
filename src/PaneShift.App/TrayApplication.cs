@@ -10,7 +10,8 @@ namespace PaneShift.App;
 
 public partial class App : System.Windows.Application
 {
-    private WindowService windows = new();
+    private readonly RuntimeSettings runtime = new();
+    private readonly WindowService windows;
     private SettingsStore? settingsStore;
     private string? settingsWarning;
     private readonly PaneShiftConfiguration configuration = PaneShiftConfiguration.Default;
@@ -23,6 +24,8 @@ public partial class App : System.Windows.Application
     private Forms.ContextMenuStrip? menu;
     private IReadOnlyList<HotkeyRegistrationFailure> failures = [];
     private bool paused;
+
+    public App() => windows = new WindowService(runtime);
 
     protected override void OnStartup(System.Windows.StartupEventArgs e)
     {
@@ -40,7 +43,7 @@ public partial class App : System.Windows.Application
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PaneShift", "settings.json"));
             var loaded = settingsStore.LoadOrCreate();
             settingsWarning = loaded.Warning;
-            windows = new WindowService(loaded.Settings);
+            runtime.ReplaceCurrent(loaded.Settings);
             source = new HwndSource(new HwndSourceParameters("PaneShift.Hotkeys")
             {
                 ParentWindow = new nint(-3), // HWND_MESSAGE: no visible or focusable window.
@@ -48,8 +51,12 @@ public partial class App : System.Windows.Application
             });
             source.AddHook(OnMessage);
             menu = new Forms.ContextMenuStrip();
+            menu.Items.Add(new Forms.ToolStripMenuItem("PaneShift") { Enabled = false });
+            menu.Items.Add(new Forms.ToolStripSeparator());
             menu.Items.Add("Shortcuts and status", null, (_, _) => ShowStatus());
             menu.Items.Add("Open Settings File", null, (_, _) => OpenSettingsFile());
+            menu.Items.Add("Reload Settings", null, (_, _) => ReloadSettings());
+            menu.Items.Add(new Forms.ToolStripSeparator());
             var pause = new Forms.ToolStripMenuItem("Pause shortcuts") { CheckOnClick = true };
             pause.Click += (_, _) =>
             {
@@ -113,11 +120,32 @@ public partial class App : System.Windows.Application
                 $"{FormatShortcut(f.Binding)} — {f.Binding.Action}: {f.Reason}"));
         if (settingsWarning is not null) text += "\n\n" + settingsWarning;
         if (applicationIcon?.Warning is { } iconWarning) text += "\n\n" + iconWarning;
-        text += "\n\nSettings changes take effect after restarting PaneShift.";
+        text += "\n\nActive settings:\n" + DescribeSettings();
+        text += "\n\nAfter saving settings.json, choose Reload Settings from the tray.";
         System.Windows.MessageBox.Show(text, "PaneShift — Shortcuts and status");
     }
 
     private void Notify(string message) => tray?.ShowBalloonTip(6000, "PaneShift", message, Forms.ToolTipIcon.Warning);
+
+    private void ReloadSettings()
+    {
+        if (settingsStore is null) return;
+        settingsWarning = runtime.Reload(settingsStore);
+        if (settingsWarning is not null)
+        {
+            tray?.ShowBalloonTip(6000, "PaneShift — Settings reload failed",
+                "Could not load settings.json. Existing settings remain active. See Shortcuts and status for details.",
+                Forms.ToolTipIcon.Error);
+            return;
+        }
+        tray?.ShowBalloonTip(4000, "PaneShift — Settings reloaded", DescribeSettings(), Forms.ToolTipIcon.Info);
+    }
+
+    private string DescribeSettings()
+    {
+        var settings = runtime.Current;
+        return $"Gap: {settings.GapPixels} px\nScreen-edge gaps: {(settings.ApplyGapToScreenEdges ? "On" : "Off")}\nHalf repeat: Cycle sizes";
+    }
 
     private static string FormatShortcut(HotkeyBinding binding)
     {

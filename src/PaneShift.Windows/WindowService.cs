@@ -8,15 +8,14 @@ namespace PaneShift.Windows;
 public sealed class WindowService
 {
     private readonly WindowHistory history = new();
-    private readonly CommandRepetition repetition = new();
-    private readonly PaneShiftSettings settings;
+    private readonly RuntimeSettings runtime;
+    private CommandRepetition repetition => runtime.Repetition;
     private readonly Dictionary<nint, SavedPlacement> placements = [];
     private sealed record SavedPlacement(uint ProcessId, uint ThreadId, NativeMethods.WindowPlacement Placement);
 
-    public WindowService(PaneShiftSettings? settings = null)
+    public WindowService(RuntimeSettings? runtime = null)
     {
-        this.settings = settings ?? new();
-        this.settings.Validate();
+        this.runtime = runtime ?? new();
     }
 
     public void Execute(WindowAction action)
@@ -33,6 +32,7 @@ public sealed class WindowService
 
     private void ExecuteCore(WindowAction action)
     {
+        var settings = runtime.Current;
         PruneHistory();
         nint hwnd = NativeMethods.GetForegroundWindow();
         if (!NativeMethods.IsWindow(hwnd) || !CanManage(hwnd)) { repetition.Reset(); return; }

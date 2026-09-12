@@ -1,5 +1,9 @@
 # PaneShift
 
+<p align="center">
+  <img src="assets/paneshift.png" alt="PaneShift logo" width="160" />
+</p>
+
 A keyboard-first Windows window manager inspired by Rectangle's positioning workflow on macOS. An independent MIT-licensed implementation; no Rectangle branding, code, or assets are reused.
 
 ## Build and run
@@ -13,7 +17,7 @@ dotnet test PaneShift.sln -c Release --no-build
 dotnet run --project src/PaneShift.App
 ```
 
-The app starts in the notification area (possibly in its overflow menu), without a main window. Right-click the icon for **Shortcuts and status**, **Open Settings File**, **Pause shortcuts**, or **Exit**. Pause releases registrations and resets command repetition; resume retries registrations. A second instance exits with a message. Exit unregisters hotkeys and removes the icon. Exit an older running copy before rebuilding or starting the new version.
+The app starts in the notification area (possibly in its overflow menu), without a main window. Right-click the icon for **Shortcuts and status**, **Open Settings File**, **Reload Settings**, **Pause shortcuts**, or **Exit**. Pause releases registrations and resets command repetition; resume retries registrations. A second instance exits with a message. Exit unregisters hotkeys and removes the icon. Exit an older running copy before rebuilding or starting a new application version.
 
 ## Default shortcuts
 
@@ -45,7 +49,7 @@ Registration conflicts appear in a tray notification and the status dialog. Succ
 
 ## Settings and gaps
 
-Settings are read once at startup from `%LOCALAPPDATA%\PaneShift\settings.json`. The file is created with defaults if missing:
+Settings are read at startup and on explicit **Reload Settings** from `%LOCALAPPDATA%\PaneShift\settings.json`. At startup, the file is created with defaults if missing:
 
 ```json
 {
@@ -57,9 +61,18 @@ Settings are read once at startup from `%LOCALAPPDATA%\PaneShift\settings.json`.
 }
 ```
 
-**Open Settings File** reveals the JSON in Explorer. Edit it in a text editor, then Exit and restart PaneShift to apply changes. There is no file watcher, polling, background timer, or settings window. Hotkey editing remains in `PaneShiftConfiguration`; the JSON currently controls gaps and the repetition strategy only. `cycleSizes` is the only implemented repetition strategy.
+To apply changes without restarting:
 
-Missing properties inherit defaults and unknown properties are ignored. Invalid JSON, negative gaps, unsupported repetition values, and file-access errors generate a warning and use defaults for that session. The warning remains available in shortcut/status view. Existing settings files are never rewritten automatically, including malformed files; fix them manually. Valid files are not rewritten on startup.
+1. Choose **Open Settings File** from the tray to reveal the JSON in Explorer.
+2. Edit `settings.json` in a text editor.
+3. Save the file.
+4. Choose **Reload Settings** from the tray.
+
+The next positioning command uses the new configuration. Existing windows are not moved by reload. A successful reload resets the half-action cycle to 1/2 and preserves original Restore history, pause state, and hotkey registrations. The success notification and status dialog show active gap, screen-edge, and repetition settings. Reload is available while paused.
+
+There is no file watcher, polling, background timer, or settings window. Hotkey editing remains in `PaneShiftConfiguration`; the JSON currently controls gaps and the repetition strategy only. `cycleSizes` is the only implemented repetition strategy.
+
+Missing properties inherit defaults and unknown properties are ignored. On **runtime reload**, invalid JSON, negative gaps, unsupported repetition values, missing files, and file-access errors keep the current known-good configuration and repetition state completely unchanged. A concise failure notification appears; details remain in **Shortcuts and status** until a successful reload clears them. Reload never creates or rewrites the file. At **startup**, when no active configuration exists yet, load failures still use safe defaults and report a warning. Existing files, including malformed files, are never overwritten automatically.
 
 `gapPixels` is a nonnegative count of **physical pixels**, applied to the visible window frame after the ideal tile is calculated. Zero preserves the original ideal geometry. An internal leading edge receives `floor(gap/2)` inset and an internal trailing edge receives `ceil(gap/2)`: adjacent windows have exactly the configured gap, including odd values. There is no cumulative inset across commands. With `applyGapToScreenEdges: false`, outer edges stay flush with the work area; with `true`, outer edges receive the full gap. Taskbar space stays excluded.
 
@@ -67,14 +80,16 @@ The generic transformation applies to all tiled layouts and repeated half sizes.
 
 ## Icon asset
 
-Add an approved original `assets/paneshift.ico` and rebuild to use it automatically for both executable and tray. The conditional project resource and central `ApplicationIcon` loader are already wired, including a cached icon source for future WPF windows. Without artwork, the Windows application icon remains the fallback. A future installer should use the same asset. See [assets/README.md](assets/README.md) for ICO sizes and integration details; no branded placeholder has been generated.
+PaneShift includes its finalized original artwork: `assets/paneshift.ico` is the authoritative Windows icon, and `assets/paneshift.png` is the high-resolution branding image used above. The ICO supplies the executable's native icon and is embedded as `PaneShift.Icon` for the central `ApplicationIcon` loader. Both built and published applications use embedded resources, with no dependency on a deployed source `assets` directory. The loader supplies the tray and a cached icon source for future WPF windows; a future installer should reference the same ICO. The defensive runtime fallback remains available if loading fails. See [assets/README.md](assets/README.md).
 
 ## Architecture
 
-- `PaneShift.Core` (`net10.0`): physical-pixel rectangles, pure geometry and gap transform, separate command repetition state and half-size strategy, action identifiers, hotkey/settings models, portable JSON file persistence, original window geometry history. No platform API calls.
+- `PaneShift.Core` (`net10.0`): physical-pixel rectangles, pure geometry and gap transform, separate command repetition state and half-size strategy, action identifiers, hotkey/settings models, portable JSON file persistence, original window geometry history. `RuntimeSettings` owns the immutable active snapshot and the repetition state it resets when committing a valid candidate. No platform API calls.
 - `PaneShift.Windows` (`net10.0-windows`): Win32/DWM P/Invoke, foreground-window and monitor work-area retrieval, window placement, visible-frame compensation, and global hotkey lifecycle.
 - `PaneShift.App` (`net10.0-windows`): WPF lifecycle, message-only HWND, settings path/loading and Explorer integration, centralized icon loading. Windows Forms supplies only the notification icon and its menu. No external window-management dependencies.
-- `PaneShift.Core.Tests`: xUnit geometry, partition coverage, repetition/reset, gap adjacency, history, settings persistence/validation and shortcut tests.
+- `PaneShift.Core.Tests`: xUnit geometry, partition coverage, repetition/reset, gap adjacency, history, settings persistence/validation, runtime reload and shortcut tests.
+
+`SettingsStore.LoadCandidate()` reads/deserializes/validates without changing live state. `RuntimeSettings.ReplaceCurrent()` commits a validated snapshot and resets repetition on the same UI thread that handles commands. `WindowService` reads that snapshot once per action and remains alive across reloads, preserving its native placement history. Candidate loading and commit remain separate so future hotkey preparation can be inserted before commit; persisted hotkeys are not implemented here.
 
 Layouts use rational boundaries relative to the active window's monitor **work area**, preserving taskbar space. Each integer boundary is `size * numerator / denominator`, with 64-bit intermediate arithmetic. Adjacent regions share boundaries, avoiding gaps at odd widths. Center Two Thirds spans 1/6 to 5/6. Rounding differences are at most one pixel. Degenerate zero-sized tiles are rejected.
 
@@ -84,9 +99,9 @@ Before the first modification, the service saves original geometry and native pl
 
 ## Milestone scope
 
-Implemented: halves with repeated size cycling, corners, thirds, two thirds, six sixths, generic pixel gaps, persisted JSON settings, Maximize, Center, tray operation, 18 default global shortcuts, and optional icon infrastructure. Repetition state accepts a sequence length independently of geometry; the half-size strategy supplies the current sequence. Other strategies can be added separately without changing the state tracker.
+Implemented: halves with repeated size cycling, corners, thirds, two thirds, six sixths, generic pixel gaps, persisted JSON settings with explicit runtime reload, Maximize, Center, tray operation, 18 default global shortcuts, and finalized project artwork. Repetition state accepts a sequence length independently of geometry; the half-size strategy supplies the current sequence. Other strategies can be added separately without changing the state tracker.
 
-Almost Maximize, Maximize Height, Make Smaller/Larger, and Next/Previous Display have reserved action identifiers. Unsupported actions fail explicitly before window modification. Display transitions, lifecycle-aware history, configurable sequences, persisted hotkeys, a settings UI, installer, and final icon artwork are deferred.
+Almost Maximize, Maximize Height, Make Smaller/Larger, and Next/Previous Display have reserved action identifiers. Unsupported actions fail explicitly before window modification. Display transitions, lifecycle-aware history, configurable sequences, persisted hotkeys, a settings UI, and installer are deferred.
 
 PaneShift uses `RegisterHotKey` with `MOD_NOREPEAT`. It does not inject DLLs, access process memory, install keyboard hooks, or request elevation. This cannot guarantee compatibility with every game or anti-cheat system; use Pause when needed. Applications may enforce minimum sizes or reject placement, and elevated applications may be inaccessible. Native failures produce tray notifications. A successful positioning call does not guarantee that a target application accepted the exact size.
 
@@ -100,10 +115,17 @@ API references: [RegisterHotKey](https://learn.microsoft.com/en-us/windows/win32
 4. Reserve a shortcut in another application and verify the conflict appears while other shortcuts still work.
 5. Pause/resume, launch a second instance, and Exit; verify hotkey release and icon cleanup.
 6. Focus Chrome on an ultrawide and press/release **Ctrl+Alt+Left** four times. Verify 1/2 → 2/3 → 1/3 → 1/2 with a fixed left edge. Repeat for Right, Top, and Bottom, checking the corresponding anchor. Invoke a different action, and then return to a half action: it starts at 1/2. Target another window between repeats and verify the same reset. Pause/resume also starts over.
-7. Set `gapPixels` to 12 and `applyGapToScreenEdges` to false; restart. Place **First Two Thirds | Last Third** on two windows: verify exactly 12 physical pixels between visible frames and flush outer edges. Enable screen-edge gaps and restart: verify 12px against each touched work-area edge. Repeat with odd gap 11 and with 0 for the original gapless layout.
+7. Set `gapPixels` to 12 and `applyGapToScreenEdges` to false; save and choose **Reload Settings**. Place **First Two Thirds | Last Third** on two windows: verify exactly 12 physical pixels between visible frames and flush outer edges. Enable screen-edge gaps and reload: verify 12px against each touched work-area edge. Repeat with odd gap 11 and with 0 for the original gapless layout.
 8. Stack **Top Right Sixth** and **Bottom Right Sixth** using **Ctrl+Shift+Win+Up/Down** on two windows. Verify correct placement and vertical gap. Test all four half cycles with gaps as well.
 9. Repeat these checks at 100%, 125%, and 150% Windows scaling where available, with negative-origin monitors and the taskbar on different edges.
-10. Edit a partial settings file, then malformed JSON: verify defaults for missing values, a visible warning for malformed JSON, continued operation, and no file overwrite. Fix and restart. Confirm **Open Settings File** reveals the correct file.
-11. Verify tray/executable fallback without artwork. When approved artwork exists, add `assets/paneshift.ico`, rebuild/restart, and check both icons. Confirm Maximize, Center, and service-level Restore still behave as before (Restore has no default binding).
+10. With gap 12 active, reload malformed JSON and then gap -1: verify a failure balloon, details in status, and that subsequent commands still use 12. Verify the JSON is not overwritten. Fix and reload; confirm the error clears. A partial valid file should use defaults for missing properties. Confirm **Open Settings File** reveals the correct file.
+11. Check the PaneShift artwork on both the tray and built/published executable. Publish with `dotnet publish src/PaneShift.App -c Release --self-contained false`, then run from its `bin/Release/net10.0-windows/publish` directory without copying source assets. Windows may cache Explorer icons. Confirm Maximize, Center, and service-level Restore still behave as before (Restore has no default binding).
+12. Progress a half action to 2/3, successfully reload, then invoke it again: it must start at 1/2. Reload must not move windows itself or lose original Restore history. Reload while paused and verify it stays paused; resume and check the new gaps. Normal startup should not produce a reload-success notification.
 
 Automated tests validate geometry without controlling other desktop applications. Mixed-DPI, fullscreen/game compatibility, and real multi-monitor behavior require manual device testing.
+
+## Validation of the settings reload milestone
+
+The Release build and framework-dependent publish completed without warnings or errors, and all 510 automated tests passed. The embedded ICO matches the approved asset; native icons extracted from both built and published executables were verified against it.
+
+Manual Windows testing confirmed that the PaneShift tray icon is displayed, Reload Settings applies changes successfully, and malformed JSON preserves the working active configuration. These checks do not replace the broader multi-monitor and DPI acceptance checks above.

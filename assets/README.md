@@ -1,10 +1,12 @@
 # PaneShift icon
 
-Place the approved original artwork at `assets/paneshift.ico`, then rebuild PaneShift.
-No placeholder branded artwork is included. Without this file, the application uses the existing Windows application icon gracefully.
+The approved original artwork is included unchanged:
 
-Use a valid multi-resolution Windows ICO (for example 16, 20, 24, 32, 40, 48, 64 and 256 pixel frames) for clear rendering at different DPI settings. Do not copy artwork from Rectangle or other applications.
+- `paneshift.ico`: authoritative Windows icon for the executable, tray, future WPF windows and future installer.
+- `paneshift.png`: high-resolution project branding, used in the README and available for future UI use. It is not used as a tray icon.
 
-`PaneShift.App.csproj` conditionally uses this file for the executable icon and embeds the same file as `PaneShift.Icon`. `ApplicationIcon` centralizes runtime loading, owns/disposes the tray icon, and exposes a cached `WindowIcon` for future WPF settings windows. Adding the file requires no source-code changes. Invalid ICO files can fail the executable build and should be corrected; runtime loading failures use the fallback and are reported in tray status.
+Preserve these approved assets; do not regenerate or destructively resize them.
+
+`PaneShift.App.csproj` uses the ICO for the executable icon and embeds the same file as `PaneShift.Icon`. `ApplicationIcon` centralizes runtime loading, owns/disposes the tray icon, and exposes a cached `WindowIcon` for future WPF settings windows. Built and published output does not require a source assets directory next to it. Runtime loading failures use the defensive fallback and are reported in tray status.
 
 A future installer should reference this same source asset. There is no installer project in this milestone. Rebuild/restart to apply artwork changes; Windows may cache executable icons.
