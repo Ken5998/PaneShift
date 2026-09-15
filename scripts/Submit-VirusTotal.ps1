@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param([Parameter(Mandatory)][string] $Version)
 . "$PSScriptRoot/Release.Common.ps1"
+. "$PSScriptRoot/VirusTotal.Multipart.ps1"
 $Version = Get-ReleaseVersion $Version
 $directory = Join-Path $ArtifactsRoot 'release'
 $notesPath = Join-Path $directory 'virustotal.md'
@@ -23,9 +24,10 @@ function Invoke-VirusTotal([string] $Uri, [string] $Method = 'Get', [IO.FileInfo
         $delay = 16 - ([DateTime]::UtcNow - $script:lastRequest).TotalSeconds
         if ($delay -gt 0) { Start-Sleep -Milliseconds ([int][Math]::Ceiling($delay * 1000)) }
         $script:lastRequest = [DateTime]::UtcNow
+        $multipart = $null
         try {
             $parameters = @{ Uri = $Uri; Method = $Method; Headers = $headers; TimeoutSec = 180; MaximumRedirection = 0 }
-            if ($File) { $parameters.Form = @{ file = $File } }
+            if ($File) { $multipart = New-VirusTotalMultipart $File; $parameters.Body = $multipart }
             return Invoke-RestMethod @parameters
         } catch {
             $responseProperty = $_.Exception.PSObject.Properties['Response']
@@ -38,7 +40,7 @@ function Invoke-VirusTotal([string] $Uri, [string] $Method = 'Get', [IO.FileInfo
             } catch { }
             # Never include request headers, the key, or raw exception details in logs.
             throw "VirusTotal request unavailable (HTTP $status; $code)."
-        }
+        } finally { if ($multipart) { $multipart.Dispose() } }
     }
 }
 $results = [Collections.Generic.List[object]]::new()

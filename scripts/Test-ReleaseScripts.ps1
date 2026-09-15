@@ -19,3 +19,18 @@ $rejected = $false
 try { Reset-ArtifactDirectory $RepoRoot } catch { $rejected = $true }
 if (-not $rejected) { throw 'Unsafe artifact cleanup was accepted.' }
 Write-Host "Release script syntax, $($valid.Count + $invalid.Count) version cases, and cleanup boundary passed."
+. "$PSScriptRoot/VirusTotal.Multipart.ps1"
+$fixture = Join-Path ([IO.Path]::GetTempPath()) ('paneshift-multipart-' + [Guid]::NewGuid().ToString('N') + '.bin')
+try {
+    [IO.File]::WriteAllBytes($fixture, [byte[]](0, 1, 13, 10, 127, 128, 255))
+    $multipart = New-VirusTotalMultipart (Get-Item $fixture)
+    try {
+        $header = $multipart.Headers.ContentType.ToString()
+        if ($header -notmatch '^multipart/form-data; boundary=PaneShift[a-f0-9]+$') { throw 'Unexpected multipart boundary header.' }
+        $bytes = $multipart.ReadAsByteArrayAsync().GetAwaiter().GetResult()
+        $wire = [Text.Encoding]::Latin1.GetString($bytes)
+        if ($wire -notmatch 'name="file"; filename="paneshift-multipart-' -or $wire -match 'filename\*') { throw 'Unexpected multipart disposition.' }
+        if (-not $wire.Contains([Text.Encoding]::Latin1.GetString([IO.File]::ReadAllBytes($fixture)))) { throw 'Multipart payload changed file bytes.' }
+    } finally { $multipart.Dispose() }
+} finally { if (Test-Path -LiteralPath $fixture) { Remove-Item -LiteralPath $fixture } }
+Write-Host 'VirusTotal multipart headers and binary payload passed.'
