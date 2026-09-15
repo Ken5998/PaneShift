@@ -109,4 +109,21 @@ Local artifact tests cannot prove the GitHub-hosted workflow, SignPath credentia
 - Initial release highlights are maintained in `docs/RELEASE_NOTES_0.1.0.md`; the draft script incorporates them while retaining the actual build's signing status. Offline checks verified draft-only arguments, notes and final-asset checksum validation without creating a GitHub release.
 - The freshly extracted ZIP launched successfully from a new directory containing spaces, with an unrelated working directory. Loaded coreclr, hostpolicy and WPF native modules came from that extracted directory. The test process was stopped and the installed copy restarted afterward.
 
-Still required: actual sign-out/sign-in startup, complete installed/portable GUI and shortcut regression, UAC checks, a clean VM without .NET and the first tagged GitHub Actions run. The portable package requires its extracted folder to remain at the registered path.
+## Manual release acceptance — 2026-09-15
+
+The maintainer confirmed successful automatic startup after reboot/sign-in, with the process visible in Task Manager → Details and the entry enabled in Windows Settings → Apps → Startup. This followed enabling startup from the installed copy launched manually through the Start Menu. The earlier unsuccessful attempt's root cause was not established; execution-environment isolation was a hypothesis, not a confirmed diagnosis. No application code change was needed for the successful test.
+
+The maintainer also confirmed administrator restart with both UAC acceptance and cancellation, plus correct window placement and proportions on a 38-inch 3840×1600 display and a 27-inch 1920×1080 display. Tests on the 38-inch display passed at both 100% and 150% scaling.
+
+On a separate 13-inch laptop at 1920×1080 and 125% scaling, the maintainer confirmed:
+
+- The extracted portable ZIP launched without asking to install .NET, displayed the tray icon and version 0.1.0, and handled shortcuts and size cycling correctly.
+- An 8-pixel gap persisted after exiting and reopening the portable app.
+- The installer installed successfully under AppData and reused the configuration created by the portable copy.
+- Enabling start at login followed by a reboot started the installed app successfully.
+- Uninstall removed the PaneShift entry from Task Manager's Startup apps while preserving `%LOCALAPPDATA%\PaneShift\settings.json`.
+- Reinstall restored the saved preferences. Start at login required a fresh opt-in, as intended: uninstall removes its registration and installation never enables it automatically.
+
+These checks complete the planned manual release smoke tests. The laptop test demonstrates startup without a runtime installation prompt; no inventory of pre-existing runtimes was recorded.
+
+Remaining release steps: commit/push this acceptance record, create and push the approved version tag, verify the first tagged GitHub Actions run and its final downloadable artifacts/checksums, review actual VirusTotal results when available, then publish the draft. No tagged workflow or real VirusTotal scan is claimed by these local/manual results. The portable package requires its extracted folder to remain at the registered path.
