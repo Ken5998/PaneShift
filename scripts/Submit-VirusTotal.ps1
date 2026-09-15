@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([Parameter(Mandatory)][string] $Version)
+param([Parameter(Mandatory)][string] $Version, [switch] $ReportOnly)
 . "$PSScriptRoot/Release.Common.ps1"
 . "$PSScriptRoot/VirusTotal.Multipart.ps1"
 $Version = Get-ReleaseVersion $Version
@@ -52,6 +52,14 @@ foreach ($name in @("PaneShift-$Version-Setup-x64.exe", "PaneShift-$Version-win-
         $checksum = "$hash  $name"
         if ($checksum -cnotin @(Get-Content (Join-Path $directory 'SHA256SUMS.txt'))) { throw 'Final artifact checksum mismatch.' }
         if ($file.Length -gt 650MB) { throw 'Artifact exceeds the VirusTotal upload limit.' }
+        $url = "https://www.virustotal.com/gui/file/$hash/detection"
+        if ($ReportOnly) {
+            $stage = 'existing analysis lookup'
+            $prefix = "- [$name]($url)"
+            $line = @(Get-Content (Join-Path $directory 'existing-notes.md') | Where-Object { $_.StartsWith($prefix, [StringComparison]::Ordinal) })
+            if ($line.Count -ne 1 -or $line[0] -notmatch 'analysis ID: `([A-Za-z0-9=_-]+)`') { throw 'No matching existing analysis ID.' }
+            $analysisId = $Matches[1]
+        } else {
         $uploadUrl = 'https://www.virustotal.com/api/v3/files'
         $stage = 'large-file upload URL'
         if ($file.Length -gt 32MB) { $uploadUrl = (Invoke-VirusTotal 'https://www.virustotal.com/api/v3/files/upload_url').data }
@@ -59,7 +67,7 @@ foreach ($name in @("PaneShift-$Version-Setup-x64.exe", "PaneShift-$Version-win-
         $uploaded = Invoke-VirusTotal $uploadUrl 'Post' $file
         $analysisId = $uploaded.data.id
         if (-not $analysisId) { throw 'VirusTotal returned no analysis ID.' }
-        $url = "https://www.virustotal.com/gui/file/$hash/detection"
+        }
         $result = [ordered]@{ name = $name; sha256 = $hash; analysisId = $analysisId; url = $url; status = 'queued' }
         $notes.Add("- [$name]($url) — submitted; analysis ID: ``$analysisId``.")
         # Bounded polling. A queued report is still useful; never invent detection counts.

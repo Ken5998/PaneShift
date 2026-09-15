@@ -61,6 +61,14 @@ The optional `VT_API_KEY` GitHub secret enables [VirusTotal API v3](https://docs
 
 **These are public sample submissions.** Only public release packages should be submitted, never private builds or user configuration. Returned analysis IDs and file hashes produce links in the draft release notes. Reports are informational: one engine detection does not automatically fail a release, and no "0 detections" claim is made without a completed API result. Maintainers should review reports before publishing. Submission/status failures are reported without exposing the key and do not alter the artifacts.
 
+## Retrying a release scan
+
+If submission fails, run **Retry release VirusTotal** from GitHub Actions on `main`, supplying the existing version without `v`. It downloads the existing installer, ZIP and checksums (including from a draft), validates each artifact before submission, and replaces only the VirusTotal section of the notes. It does not rebuild, replace assets, move tags or publish the release. `VT_API_KEY` remains a repository secret.
+
+Uploads use explicit multipart headers (unquoted boundary, quoted field and filename) for compatibility with the large-file endpoint. Release-script tests verify those headers and unchanged binary payload bytes. Diagnostics report the failing stage, HTTP status and recognized API error code without printing credentials or raw responses.
+
+Select **report_only** to refresh the analysis IDs already recorded in the release notes without another upload. IDs are accepted only from notes matching each final artifact's filename and SHA-256 report URL.
+
 ## Privacy
 
 PaneShift itself does not transmit user information to network services as part of normal window-management functionality. Source inspection found no HTTP client, telemetry, update checker or network transport in the application projects. Settings remain in `%LOCALAPPDATA%\PaneShift\settings.json`; window placement history remains in memory for the session.

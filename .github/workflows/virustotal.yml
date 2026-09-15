@@ -6,6 +6,10 @@ on:
         description: Existing release version (without v)
         required: true
         default: '0.1.0'
+      report_only:
+        description: Refresh existing analysis results without uploading again
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -30,16 +34,18 @@ jobs:
           VT_API_KEY: ${{ secrets.VT_API_KEY }}
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_REPOSITORY: ${{ github.repository }}
+          REPORT_ONLY: ${{ inputs.report_only }}
         run: |
           . ./scripts/Release.Common.ps1
           $version = Get-ReleaseVersion $env:RELEASE_VERSION
           New-Item -ItemType Directory artifacts/release | Out-Null
           gh release download "v$version" --repo $env:RELEASE_REPOSITORY --dir artifacts/release --pattern "PaneShift-$version-Setup-x64.exe" --pattern "PaneShift-$version-win-x64.zip" --pattern SHA256SUMS.txt
           if ($LASTEXITCODE -ne 0) { throw 'Could not download existing release assets.' }
-          ./scripts/Submit-VirusTotal.ps1 -Version $version
           $json = gh release view "v$version" --repo $env:RELEASE_REPOSITORY --json body
           if ($LASTEXITCODE -ne 0) { throw 'Could not read release notes.' }
           $body = ($json | ConvertFrom-Json).body
+          $body | Set-Content artifacts/release/existing-notes.md
+          ./scripts/Submit-VirusTotal.ps1 -Version $version -ReportOnly:($env:REPORT_ONLY -eq 'true')
           $body = [regex]::Replace($body, '(?ms)^## VirusTotal\r?\n.*?(?=^## |\z)', '')
           $body.TrimEnd() + "`n" + (Get-Content artifacts/release/virustotal.md -Raw) | Set-Content artifacts/release/release-notes.md
           gh release edit "v$version" --repo $env:RELEASE_REPOSITORY --notes-file artifacts/release/release-notes.md
