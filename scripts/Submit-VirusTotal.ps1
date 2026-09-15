@@ -31,13 +31,19 @@ function Invoke-VirusTotal([string] $Uri, [string] $Method = 'Get', [IO.FileInfo
             $responseProperty = $_.Exception.PSObject.Properties['Response']
             $status = if ($responseProperty -and $responseProperty.Value) { [int] $responseProperty.Value.StatusCode } else { 0 }
             if ($status -eq 429 -and $attempt -lt 2) { Start-Sleep -Seconds 60; continue }
+            $code = 'UnknownError'
+            try {
+                $reported = ($_.ErrorDetails.Message | ConvertFrom-Json).error.code
+                if ($reported -in @('BadRequestError', 'InvalidArgumentError', 'AuthenticationRequiredError', 'UserNotActiveError', 'WrongCredentialsError', 'ForbiddenError', 'NotFoundError', 'QuotaExceededError', 'TooManyRequestsError', 'TransientError', 'DeadlineExceededError')) { $code = $reported }
+            } catch { }
             # Never include request headers, the key, or raw exception details in logs.
-            throw "VirusTotal request unavailable (HTTP $status)."
+            throw "VirusTotal request unavailable (HTTP $status; $code)."
         }
     }
 }
 $results = [Collections.Generic.List[object]]::new()
 foreach ($name in @("PaneShift-$Version-Setup-x64.exe", "PaneShift-$Version-win-x64.zip")) {
+    $stage = 'artifact validation'
     try {
         $file = Get-Item -LiteralPath (Join-Path $directory $name)
         $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -45,7 +51,9 @@ foreach ($name in @("PaneShift-$Version-Setup-x64.exe", "PaneShift-$Version-win-
         if ($checksum -cnotin @(Get-Content (Join-Path $directory 'SHA256SUMS.txt'))) { throw 'Final artifact checksum mismatch.' }
         if ($file.Length -gt 650MB) { throw 'Artifact exceeds the VirusTotal upload limit.' }
         $uploadUrl = 'https://www.virustotal.com/api/v3/files'
+        $stage = 'large-file upload URL'
         if ($file.Length -gt 32MB) { $uploadUrl = (Invoke-VirusTotal 'https://www.virustotal.com/api/v3/files/upload_url').data }
+        $stage = 'file upload'
         $uploaded = Invoke-VirusTotal $uploadUrl 'Post' $file
         $analysisId = $uploaded.data.id
         if (-not $analysisId) { throw 'VirusTotal returned no analysis ID.' }
@@ -68,9 +76,9 @@ foreach ($name in @("PaneShift-$Version-Setup-x64.exe", "PaneShift-$Version-win-
     } catch {
         # Only expose our own bounded diagnostics, never arbitrary exception text.
         $reason = 'Local validation, network or response-format error.'
-        if ($_.Exception.Message -match '^VirusTotal request unavailable \(HTTP [0-9]{1,3}\)\.$') { $reason = $_.Exception.Message }
-        $notes.Add("- ${name}: submission unavailable. $reason No clean-scan claim is made; retry manually if needed.")
-        Write-Warning "VirusTotal submission unavailable for ${name}: $reason Release artifacts are unchanged."
+        if ($_.Exception.Message -match '^VirusTotal request unavailable \(HTTP [0-9]{1,3}; [A-Za-z]+\)\.$') { $reason = $_.Exception.Message }
+        $notes.Add("- ${name}: submission unavailable at $stage. $reason No clean-scan claim is made; retry manually if needed.")
+        Write-Warning "VirusTotal submission unavailable for $name at ${stage}: $reason Release artifacts are unchanged."
     }
 }
 $results | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $directory 'virustotal-results.json') -Encoding utf8NoBOM
