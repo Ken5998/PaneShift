@@ -8,6 +8,8 @@
 
 Arrange windows with configurable shortcuts, precise layouts and adjustable spacing. PaneShift lives in your notification area and keeps its settings in a native Windows interface.
 
+[Explore the website](https://ken5998.github.io/PaneShift/) · [Download PaneShift](https://github.com/Ken5998/PaneShift/releases/latest)
+
 [![Windows 11](https://img.shields.io/badge/Windows-11%20x64-0078D4)](https://github.com/Ken5998/PaneShift/releases)
 [![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)](https://dotnet.microsoft.com/)
 [![MIT License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
