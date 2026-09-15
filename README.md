@@ -40,7 +40,7 @@ An independent MIT-licensed implementation inspired by Rectangle's positioning w
 
 **Requires Windows 11 x64.** Release packages include the .NET runtime; users do not need to install .NET separately.
 
-Download from [GitHub Releases](https://github.com/Ken5998/PaneShift/releases). The initial v0.1.0 packaging is prepared; a draft is not a public download until the maintainer publishes it.
+Download the installer or portable ZIP from [GitHub Releases](https://github.com/Ken5998/PaneShift/releases/latest). [PaneShift v0.1.0](https://github.com/Ken5998/PaneShift/releases/tag/v0.1.0) is the first public release.
 
 | Package | How to use it |
 | --- | --- |
@@ -99,7 +99,7 @@ The Settings window uses Windows light/dark application colors when opened; reop
 
 ## Security and code signing
 
-**The initial prepared packages are unsigned.** SignPath Foundation integration is ready to configure after acceptance, but no current signing status is assumed. Each release's notes state its actual signing status and link to SHA-256 checksums. See the [code signing policy](docs/CODE_SIGNING.md).
+**The v0.1.0 packages are unsigned.** SignPath Foundation integration is ready to configure after acceptance, but no current signing status is assumed. Each release's notes state its actual signing status and link to SHA-256 checksums. See the [code signing policy](docs/CODE_SIGNING.md).
 
 Optional VirusTotal reports refer to the final downloadable files. Public VirusTotal submissions are public samples; reports are informational and false positives are possible. There is no fixed-hash VirusTotal badge or unverified clean-scan claim.
 

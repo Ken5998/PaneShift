@@ -126,4 +126,12 @@ On a separate 13-inch laptop at 1920×1080 and 125% scaling, the maintainer conf
 
 These checks complete the planned manual release smoke tests. The laptop test demonstrates startup without a runtime installation prompt; no inventory of pre-existing runtimes was recorded.
 
-Remaining release steps: commit/push this acceptance record, create and push the approved version tag, verify the first tagged GitHub Actions run and its final downloadable artifacts/checksums, review actual VirusTotal results when available, then publish the draft. No tagged workflow or real VirusTotal scan is claimed by these local/manual results. The portable package requires its extracted folder to remain at the registered path.
+The portable package requires its extracted folder to remain at the registered path.
+
+## Public release — 2026-09-15
+
+- Tag `v0.1.0` points to the accepted source at `afd4eed`. [Release workflow](https://github.com/Ken5998/PaneShift/actions/runs/34964992821) and CI passed.
+- All three assets were downloaded from the draft. Installer and ZIP matched both `SHA256SUMS.txt` and GitHub's asset digests. The extracted ZIP contained the expected 478 files, metadata 0.1.0, and no development files; the app was confirmed unsigned.
+- Initial VirusTotal uploads failed with HTTP 400 at the large-file upload step. Follow-up infrastructure commits on `main` added explicit multipart headers and retry/report-only workflows. Neither the tag nor the built assets was changed.
+- [The report-only run](https://github.com/Ken5998/PaneShift/actions/runs/34966289333) confirmed completed analyses for both final artifacts, each reporting 0 malicious and 0 suspicious engine results at that time. These informational results are not a guarantee of safety; report links are in the release notes.
+- [PaneShift v0.1.0](https://github.com/Ken5998/PaneShift/releases/tag/v0.1.0) was published as the first public, unsigned release after these checks.
