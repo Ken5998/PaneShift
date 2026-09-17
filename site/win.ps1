@@ -28,6 +28,15 @@ function Get-ProductVersion([string] $Path) {
     return [Diagnostics.FileVersionInfo]::GetVersionInfo($Path).ProductVersion
 }
 
+function Test-PaneShiftShouldProcess {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory)] [string] $Target,
+        [Parameter(Mandatory)] [string] $Action
+    )
+    return $PSCmdlet.ShouldProcess($Target, $Action)
+}
+
 try {
     if (-not [Environment]::Is64BitOperatingSystem -or [Environment]::OSVersion.Version -lt [Version]'10.0.22000') {
         throw 'PaneShift requires Windows 11 x64.'
@@ -57,7 +66,7 @@ try {
     if (-not $Force -and $installedVersion -eq $version) {
         Write-Host "PaneShift $version is already installed."
         if (-not $NoLaunch -and $running.Count -eq 0) {
-            if ($PSCmdlet.ShouldProcess($installedExe, 'Launch PaneShift')) { Start-Process -FilePath $installedExe }
+            if (Test-PaneShiftShouldProcess $installedExe 'Launch PaneShift') { Start-Process -FilePath $installedExe }
         }
         return
     }
@@ -77,7 +86,7 @@ try {
     if ($actualHash -cne $expectedHash.ToUpperInvariant()) { throw 'Installer SHA-256 verification failed.' }
     Write-Host 'SHA-256 verified.'
 
-    if (-not $PSCmdlet.ShouldProcess("PaneShift $version", 'Install or update')) { return }
+    if (-not (Test-PaneShiftShouldProcess "PaneShift $version" 'Install or update')) { return }
 
     if ($running.Count -gt 0) {
         Write-Host 'Closing the running PaneShift instance...'
@@ -85,7 +94,7 @@ try {
         catch { throw 'PaneShift could not be closed. Exit it from the tray, or rerun this command from an elevated terminal if it is running as administrator.' }
         foreach ($process in $running) {
             try {
-                $process.WaitForExit(10000)
+                [void] $process.WaitForExit(10000)
                 if (-not $process.HasExited) { throw 'PaneShift did not exit within 10 seconds.' }
             } catch [InvalidOperationException] { }
         }

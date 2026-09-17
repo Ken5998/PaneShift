@@ -60,6 +60,6 @@ UAC acceptance/cancellation, integrity boundaries and the live single-instance h
 ## PowerShell installer checks
 
 1. Build the site and compare `artifacts/site/win` and `artifacts/site/win.ps1` with `site/win.ps1`.
-2. Parse the script with Windows PowerShell 5.1 and PowerShell 7. Run it with `-WhatIf` against the latest public release; verify that the installer and checksums download, SHA-256 succeeds, and PaneShift is neither stopped nor installed.
+2. Parse the script with Windows PowerShell 5.1 and PowerShell 7. Run it as a script block with `-WhatIf` against the latest public release; verify that the installer and checksums download, SHA-256 succeeds, and PaneShift is neither stopped nor installed. The release-script tests must also verify that `$PSCmdlet` is only referenced inside an advanced function, which keeps the short `irm | iex` entry point valid without executing that security-sensitive pattern during routine development.
 3. Test a real install and update with PaneShift running: the process must close only after verification, the installed version must match the release, and PaneShift must restart unless `-NoLaunch` was supplied.
 4. Run it again at the current version and verify it reports the existing installation without stopping or reinstalling PaneShift. Use `-Force -WhatIf` to exercise the reinstall path without changing the installation.

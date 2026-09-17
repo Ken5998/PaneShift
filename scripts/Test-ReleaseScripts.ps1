@@ -7,8 +7,19 @@ foreach ($file in Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.ps1') {
 }
 $installerScript = Join-Path (Split-Path $PSScriptRoot -Parent) 'site/win.ps1'
 $parseTokens = $null; $parseErrors = $null
-$null = [Management.Automation.Language.Parser]::ParseFile($installerScript, [ref] $parseTokens, [ref] $parseErrors)
+$installerAst = [Management.Automation.Language.Parser]::ParseFile($installerScript, [ref] $parseTokens, [ref] $parseErrors)
 if ($parseErrors.Count) { throw "PowerShell syntax error in site/win.ps1: $parseErrors" }
+$psCmdletUses = $installerAst.FindAll({
+    param($node)
+    $node -is [Management.Automation.Language.VariableExpressionAst] -and $node.VariablePath.UserPath -ceq 'PSCmdlet'
+}, $true)
+foreach ($use in $psCmdletUses) {
+    $scope = $use.Parent
+    while ($null -ne $scope -and $scope -isnot [Management.Automation.Language.FunctionDefinitionAst]) { $scope = $scope.Parent }
+    if ($null -eq $scope -or $scope.Name -cne 'Test-PaneShiftShouldProcess') {
+        throw '$PSCmdlet must only be used inside the advanced Test-PaneShiftShouldProcess function so irm | iex remains valid.'
+    }
+}
 $valid = @('0.1.0', '0.1.1', '0.2.0', '1.0.0-rc.1', '1.0.0-alpha+build.42', '65534.0.0')
 foreach ($version in $valid) {
     if ((Get-ReleaseVersion $version) -cne $version) { throw "Version not preserved: $version" }
