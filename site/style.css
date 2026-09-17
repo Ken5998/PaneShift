@@ -7,3 +7,8 @@
 
 /* Contain the decorative screenshot glow without creating horizontal scrolling. */
 .settings-section{overflow:clip}
+
+.terminal-install{display:flex;align-items:center;gap:12px;width:max-content;max-width:100%;margin:24px auto 0;padding:10px 14px;border:1px solid #40536a;border-radius:7px;background:#101820;color:#dce8f5;font:12px/1.5 Consolas,monospace}
+.terminal-install span{color:#8dbdf3;font:600 9px/1.5 Inter,"Segoe UI",Arial,sans-serif;letter-spacing:1px;text-transform:uppercase}
+.terminal-install code{overflow-wrap:anywhere}
+@media(max-width:700px){.terminal-install{align-items:flex-start;flex-direction:column;text-align:left;font-size:10px}}

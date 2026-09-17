@@ -4,7 +4,9 @@ The landing page lives in `site/`. It uses plain HTML, CSS and JavaScript, local
 
 Run `./scripts/Build-Site.ps1` with PowerShell 7 to assemble `artifacts/site/`. Serve this folder with any local static HTTP server. The same script runs in `.github/workflows/pages.yml`; only explicitly copied public files are uploaded. GitHub Pages must use **GitHub Actions** as its publishing source.
 
-The initial public URL is `https://ken5998.github.io/PaneShift/`. Relative asset paths work both there and at a custom-domain root. When a new app release ships, update the version text, release links, and versioned installer/ZIP links in `site/index.html` together. The page intentionally links to a specific existing release rather than constructing a future filename under `/latest/download/`.
+The initial public URL is `https://ken5998.github.io/PaneShift/`. Relative asset paths work both there and at a custom-domain root. When a new app release ships, update the version text and release links in `site/index.html` together. General download buttons use GitHub's latest-release page so they never point at an unpublished asset.
+
+`site/win.ps1` is published as both `/win` and `/win.ps1`. The extensionless endpoint supports the short installation command shown on the site; the `.ps1` endpoint makes the source easy to inspect. Keep the script provider-neutral: it resolves the latest stable GitHub release, accepts only exact GitHub asset URLs, verifies the installer against `SHA256SUMS.txt`, and then runs the per-user installer. No Cloudflare Worker or separate DNS route is required.
 
 ## Custom domain
 

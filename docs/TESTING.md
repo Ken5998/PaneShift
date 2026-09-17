@@ -56,3 +56,10 @@ Automated tests validate geometry without controlling other desktop applications
 13. While elevated, launch another standard copy: verify a friendly single-instance message, no crash and no extra icon. Exit elevated PaneShift and start from standard Explorer to return to Standard.
 
 UAC acceptance/cancellation, integrity boundaries and the live single-instance handoff require manual Windows testing. The automated tests do not simulate Windows security with sleeps or timing assumptions.
+
+## PowerShell installer checks
+
+1. Build the site and compare `artifacts/site/win` and `artifacts/site/win.ps1` with `site/win.ps1`.
+2. Parse the script with Windows PowerShell 5.1 and PowerShell 7. Run it with `-WhatIf` against the latest public release; verify that the installer and checksums download, SHA-256 succeeds, and PaneShift is neither stopped nor installed.
+3. Test a real install and update with PaneShift running: the process must close only after verification, the installed version must match the release, and PaneShift must restart unless `-NoLaunch` was supplied.
+4. Run it again at the current version and verify it reports the existing installation without stopping or reinstalling PaneShift. Use `-Force -WhatIf` to exercise the reinstall path without changing the installation.

@@ -45,6 +45,14 @@ An independent MIT-licensed implementation inspired by Rectangle's positioning w
 
 Download the installer or portable ZIP from the [latest published GitHub release](https://github.com/Ken5998/PaneShift/releases/latest). **[PaneShift v0.1.1](https://github.com/Ken5998/PaneShift/releases/tag/v0.1.1)** adds horizontal shortcut cycling; see the [0.1.1 release notes](docs/RELEASE_NOTES_0.1.1.md).
 
+Or install/update from PowerShell without administrator rights:
+
+```powershell
+irm https://paneshift.ksmvc.ch/win | iex
+```
+
+The script downloads the latest published installer from GitHub, verifies it against the release's SHA-256 checksum, closes an installed PaneShift instance when necessary, performs a silent per-user install/update, and launches PaneShift afterward. Use `& ([scriptblock]::Create((irm https://paneshift.ksmvc.ch/win))) -NoLaunch` to leave it closed, or add `-Force` to reinstall the current version. As with every `irm | iex` command, inspect [the script](https://paneshift.ksmvc.ch/win.ps1) first if desired.
+
 | Package | How to use it |
 | --- | --- |
 | `PaneShift-<version>-Setup-x64.exe` | Install for the current user, normally in `%LOCALAPPDATA%\Programs\PaneShift`. Start Menu shortcut is optional; desktop shortcut is unchecked by default. |

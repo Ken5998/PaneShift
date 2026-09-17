@@ -5,6 +5,10 @@ foreach ($file in Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.ps1') {
     $null = [Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref] $parseTokens, [ref] $parseErrors)
     if ($parseErrors.Count) { throw "PowerShell syntax error in $($file.Name): $parseErrors" }
 }
+$installerScript = Join-Path (Split-Path $PSScriptRoot -Parent) 'site/win.ps1'
+$parseTokens = $null; $parseErrors = $null
+$null = [Management.Automation.Language.Parser]::ParseFile($installerScript, [ref] $parseTokens, [ref] $parseErrors)
+if ($parseErrors.Count) { throw "PowerShell syntax error in site/win.ps1: $parseErrors" }
 $valid = @('0.1.0', '0.1.1', '0.2.0', '1.0.0-rc.1', '1.0.0-alpha+build.42', '65534.0.0')
 foreach ($version in $valid) {
     if ((Get-ReleaseVersion $version) -cne $version) { throw "Version not preserved: $version" }
