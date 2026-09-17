@@ -43,7 +43,7 @@ An independent MIT-licensed implementation inspired by Rectangle's positioning w
 
 **Requires Windows 11 x64.** Release packages include the .NET runtime; users do not need to install .NET separately.
 
-Download the installer or portable ZIP from the [latest published GitHub release](https://github.com/Ken5998/PaneShift/releases/latest). This source tree targets **0.1.1**, adding horizontal shortcut cycling; see the [0.1.1 release notes](docs/RELEASE_NOTES_0.1.1.md). Downloads update when a release is published.
+Download the installer or portable ZIP from the [latest published GitHub release](https://github.com/Ken5998/PaneShift/releases/latest). **[PaneShift v0.1.1](https://github.com/Ken5998/PaneShift/releases/tag/v0.1.1)** adds horizontal shortcut cycling; see the [0.1.1 release notes](docs/RELEASE_NOTES_0.1.1.md).
 
 | Package | How to use it |
 | --- | --- |
@@ -102,7 +102,7 @@ The Settings window uses Windows light/dark application colors when opened; reop
 
 ## Security and code signing
 
-**The v0.1.0 packages are unsigned.** SignPath Foundation integration is ready to configure after acceptance, but no current signing status is assumed. Each release's notes state its actual signing status and link to SHA-256 checksums. See the [code signing policy](docs/CODE_SIGNING.md).
+**The v0.1.1 packages are unsigned.** SignPath Foundation integration is ready to configure after acceptance, but no current signing status is assumed. Each release's notes state its actual signing status and link to SHA-256 checksums. See the [code signing policy](docs/CODE_SIGNING.md).
 
 Optional VirusTotal reports refer to the final downloadable files. Public VirusTotal submissions are public samples; reports are informational and false positives are possible. There is no fixed-hash VirusTotal badge or unverified clean-scan claim.
 
@@ -141,7 +141,7 @@ Use PowerShell 7. The helper installs a verified, pinned Inno Setup compiler und
 | `PaneShift.App` | WPF lifecycle and Settings; Windows Forms only for the tray icon/menu |
 | `PaneShift.Core.Tests` / `PaneShift.Windows.Tests` | Geometry, settings, transactional rollback, draft state and Windows-support logic |
 
-Read the [architecture notes](docs/ARCHITECTURE.md), [manual regression checklist](docs/TESTING.md), and [release acceptance checklist](docs/RELEASING.md#release-acceptance-checklist). The current application suite contains 570 tests; release-script validation is separate and does not require signing credentials or global hotkey availability.
+Read the [architecture notes](docs/ARCHITECTURE.md), [manual regression checklist](docs/TESTING.md), and [release acceptance checklist](docs/RELEASING.md#release-acceptance-checklist). The current application suite contains 583 tests; release-script validation is separate and does not require signing credentials or global hotkey availability.
 
 ## License
 

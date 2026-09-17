@@ -145,3 +145,11 @@ The portable package requires its extracted folder to remain at the registered p
 - Initial VirusTotal uploads failed with HTTP 400 at the large-file upload step. Follow-up infrastructure commits on `main` added explicit multipart headers and retry/report-only workflows. Neither the tag nor the built assets was changed.
 - [The report-only run](https://github.com/Ken5998/PaneShift/actions/runs/34966289333) confirmed completed analyses for both final artifacts, each reporting 0 malicious and 0 suspicious engine results at that time. These informational results are not a guarantee of safety; report links are in the release notes.
 - [PaneShift v0.1.0](https://github.com/Ken5998/PaneShift/releases/tag/v0.1.0) was published as the first public, unsigned release after these checks.
+
+## Public release 0.1.1 — 2026-09-17
+
+- Tag `v0.1.1` points to commit `d5e2079`; CI, website deployment and the release workflow completed successfully.
+- The installer, portable ZIP and SHA-256 checksums were generated and published by the release workflow. The release is unsigned and states that explicitly.
+- Manual acceptance confirmed horizontal cycling for thirds, two-thirds and top/bottom sixth shortcuts, including wraparound and reset behavior.
+- VirusTotal reports matched the published asset hashes and reported 0 malicious / 0 suspicious results from 68 engines for the installer and 65 engines for the ZIP at publication time. These results remain informational.
+- [PaneShift v0.1.1](https://github.com/Ken5998/PaneShift/releases/tag/v0.1.1) is published as the latest release.
