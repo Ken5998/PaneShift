@@ -25,9 +25,9 @@ To apply changes without restarting:
 3. Save the file.
 4. Choose **Reload Settings** from the tray.
 
-The next positioning command uses the new configuration. Existing windows are not moved by Apply or Reload. Success resets the half-action cycle to 1/2, preserves original Restore history and pause state, and activates the new shortcut map. While paused, Apply/Reload briefly probes the complete candidate map, then releases registrations and stays paused; another application can still claim a chord before resume.
+The next positioning command uses the new configuration. Existing windows are not moved by Apply or Reload. Success resets all repeated-command cycles to their initial layout, preserves original Restore history and pause state, and activates the new shortcut map. While paused, Apply/Reload briefly probes the complete candidate map, then releases registrations and stays paused; another application can still claim a chord before resume.
 
-The Settings window is the primary editor; the explicit JSON workflow remains supported. There is no file watcher, polling or background timer. `cycleSizes` is the only implemented repetition strategy. A successful external reload refreshes an open clean draft. If it has edits, the window preserves them and blocks Apply until you explicitly choose **Reload into this window** (with confirmation) or discard and reopen.
+The Settings window is the primary editor; the explicit JSON workflow remains supported. There is no file watcher, polling or background timer. `cycleSizes` is the only supported value for `halfActions`. Third, two-thirds and sixth actions always cycle horizontally within their size and row; no additional setting is needed. A successful external reload refreshes an open clean draft. If it has edits, the window preserves them and blocks Apply until you explicitly choose **Reload into this window** (with confirmation) or discard and reopen.
 
 An optional `hotkeys` object maps stable, case-sensitive action IDs to chords. Missing/null sections use existing defaults; missing entries inherit that action's default, while a JSON `null` entry explicitly disables it. For example, add this property to bind Restore and disable Center:
 

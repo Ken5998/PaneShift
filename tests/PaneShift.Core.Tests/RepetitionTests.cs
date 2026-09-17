@@ -4,6 +4,35 @@ namespace PaneShift.Core.Tests;
 
 public class RepetitionTests
 {
+    [Theory]
+    [InlineData(WindowAction.FirstThird, WindowAction.FirstThird, WindowAction.CenterThird, WindowAction.LastThird)]
+    [InlineData(WindowAction.CenterThird, WindowAction.CenterThird, WindowAction.LastThird, WindowAction.FirstThird)]
+    [InlineData(WindowAction.LastThird, WindowAction.LastThird, WindowAction.CenterThird, WindowAction.FirstThird)]
+    [InlineData(WindowAction.FirstTwoThirds, WindowAction.FirstTwoThirds, WindowAction.CenterTwoThirds, WindowAction.LastTwoThirds)]
+    [InlineData(WindowAction.CenterTwoThirds, WindowAction.CenterTwoThirds, WindowAction.LastTwoThirds, WindowAction.FirstTwoThirds)]
+    [InlineData(WindowAction.LastTwoThirds, WindowAction.LastTwoThirds, WindowAction.CenterTwoThirds, WindowAction.FirstTwoThirds)]
+    [InlineData(WindowAction.TopLeftSixth, WindowAction.TopLeftSixth, WindowAction.TopCenterSixth, WindowAction.TopRightSixth)]
+    [InlineData(WindowAction.TopCenterSixth, WindowAction.TopCenterSixth, WindowAction.TopRightSixth, WindowAction.TopLeftSixth)]
+    [InlineData(WindowAction.TopRightSixth, WindowAction.TopRightSixth, WindowAction.TopCenterSixth, WindowAction.TopLeftSixth)]
+    [InlineData(WindowAction.BottomLeftSixth, WindowAction.BottomLeftSixth, WindowAction.BottomCenterSixth, WindowAction.BottomRightSixth)]
+    [InlineData(WindowAction.BottomCenterSixth, WindowAction.BottomCenterSixth, WindowAction.BottomRightSixth, WindowAction.BottomLeftSixth)]
+    [InlineData(WindowAction.BottomRightSixth, WindowAction.BottomRightSixth, WindowAction.BottomCenterSixth, WindowAction.BottomLeftSixth)]
+    public void PositionCyclesKeepSizeAndRow(WindowAction shortcut, params WindowAction[] expected)
+    {
+        Assert.True(PositionActionCycle.AppliesTo(shortcut));
+        Assert.Equal(expected, Enumerable.Range(0, PositionActionCycle.Length)
+            .Select(index => PositionActionCycle.At(shortcut, index)));
+    }
+
+    [Fact]
+    public void PositionCycleRejectsUnrelatedActionsAndInvalidIndexes()
+    {
+        Assert.False(PositionActionCycle.AppliesTo(WindowAction.LeftHalf));
+        Assert.Throws<ArgumentException>(() => PositionActionCycle.At(WindowAction.LeftHalf, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => PositionActionCycle.At(WindowAction.FirstThird, -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => PositionActionCycle.At(WindowAction.FirstThird, 3));
+    }
+
     [Fact]
     public void ConsecutiveSameTargetAndActionWrapAround()
     {

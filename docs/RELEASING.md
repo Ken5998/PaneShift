@@ -2,7 +2,9 @@
 
 ## Version and build tools
 
-`Directory.Build.props` is the single local version source (initially `0.1.0`). A tagged release uses its validated `v<SemVer>` tag to pass `-p:Version=<SemVer>` through build/publish. Assembly/FileVersion use the three numeric components plus `.0`; ProductVersion and Settings show the complete semantic version. Numeric components must fit Windows metadata (0–65534). The manifest's fixed assembly identity is a loader identity, not the product version; its asInvoker, uiAccess and Per-Monitor V2 settings remain unchanged.
+`Directory.Build.props` is the single local version source (currently `0.1.1`). A tagged release uses its validated `v<SemVer>` tag to pass `-p:Version=<SemVer>` through build/publish. Assembly/FileVersion use the three numeric components plus `.0`; ProductVersion and Settings show the complete semantic version. Numeric components must fit Windows metadata (0–65534). The manifest's fixed assembly identity is a loader identity, not the product version; its asInvoker, uiAccess and Per-Monitor V2 settings remain unchanged.
+
+For every release, update the version, README, website feature descriptions and download references, and add `docs/RELEASE_NOTES_<version>.md` with `## Highlights` and `## Downloads` sections. The draft script includes that version's highlights automatically. Preserve historical release notes and screenshot version captions. Public download links should point to `/releases/latest` until version-specific assets are published and verified; never advertise a draft as available. Run the application tests, release-script checks and site build before committing and pushing.
 
 Use Windows 11 x64, PowerShell 7, .NET 10 SDK, and Inno Setup 6.7 or newer. GitHub-hosted `windows-2025` runners build CI and releases. Action revisions are pinned; review dependency updates deliberately. The runtime patch comes from the installed .NET SDK, so rebuild releases when runtime security servicing requires it.
 
@@ -91,6 +93,14 @@ Use a clean Windows 11 x64 VM without .NET installed for the final no-prerequisi
 12. Review the draft assets and optional VirusTotal links. The workflow does not equate a successful upload or a low detection count with safety. Publish the draft only after acceptance.
 
 Local artifact tests cannot prove the GitHub-hosted workflow, SignPath credentials/approval policy, VirusTotal account quota, SmartScreen reputation or a clean VM without .NET. Record those checks separately rather than fabricating results.
+
+## 0.1.1 preparation — 2026-09-17
+
+- Installed the official .NET SDK 10.0.401 locally under ignored `artifacts/tools/dotnet`, verifying the archive against Microsoft's SHA-512 release metadata.
+- Release build passed with zero warnings/errors; all 583 tests passed (536 Core, 47 Windows/App support).
+- Release-script syntax, 16 version cases, cleanup boundary and VirusTotal multipart checks passed. Version-specific highlights were verified for both 0.1.0 and 0.1.1.
+- The static website assembled successfully. README and site download links use the latest published release, so they do not depend on unpublished 0.1.1 assets.
+- Self-contained win-x64 publication passed metadata and content validation for 0.1.1 (478 files). Installer packaging and interactive shortcut acceptance remain release checks; these results do not represent a public release.
 
 ## Local validation — 2026-09-12
 

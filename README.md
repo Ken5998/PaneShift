@@ -28,6 +28,7 @@ Arrange windows with configurable shortcuts, precise layouts and adjustable spac
 
 - Halves, corners, thirds, two-thirds and all six sixths, plus Maximize, Center and Restore.
 - Repeated half shortcuts cycle **1/2 → 2/3 → 1/3** along the same edge.
+- Repeated third, two-thirds and sixth shortcuts cycle horizontally while keeping the same size and row.
 - Configurable hotkeys with a keyboard recorder, explicit clearing and duplicate detection.
 - Adjustable gaps between windows and optional spacing at monitor work-area edges.
 - Multi-monitor work-area geometry, negative monitor coordinates and Per-Monitor V2 DPI awareness.
@@ -42,7 +43,7 @@ An independent MIT-licensed implementation inspired by Rectangle's positioning w
 
 **Requires Windows 11 x64.** Release packages include the .NET runtime; users do not need to install .NET separately.
 
-Download the installer or portable ZIP from [GitHub Releases](https://github.com/Ken5998/PaneShift/releases/latest). [PaneShift v0.1.0](https://github.com/Ken5998/PaneShift/releases/tag/v0.1.0) is the first public release.
+Download the installer or portable ZIP from the [latest published GitHub release](https://github.com/Ken5998/PaneShift/releases/latest). This source tree targets **0.1.1**, adding horizontal shortcut cycling; see the [0.1.1 release notes](docs/RELEASE_NOTES_0.1.1.md). Downloads update when a release is published.
 
 | Package | How to use it |
 | --- | --- |
@@ -71,7 +72,7 @@ The following use **Ctrl + Alt**:
 
 **Ctrl + Shift + Win + Up / Down** place the Top Right / Bottom Right Sixth. There are 18 default bindings. The remaining four sixth actions and Restore can be assigned in Settings.
 
-Release each chord before repeating it. Repeated halves cycle sizes on the same target; another action, another target, pause or a failed command resets the sequence. Restore keeps the window's original placement for the current PaneShift session.
+Release each chord before repeating it. Repeated halves cycle sizes on the same target. Thirds and two-thirds move through the horizontal positions; sixths stay in their top or bottom row. Another action, another target, pause or a failed command resets the sequence. Restore keeps the window's original placement for the current PaneShift session.
 
 ## Settings
 
@@ -93,7 +94,7 @@ Configuration is stored at:
 %LOCALAPPDATA%\PaneShift\settings.json
 ```
 
-The tray's **Open Settings File** reveals the JSON in Explorer. After editing it, choose **Reload Settings**. A valid reload updates layout and hotkeys, preserves Restore history and pause state, and resets the half cycle. Failed reloads retain the last working configuration. Unsaved GUI edits are preserved with an explicit reload prompt. There is no file watcher or background polling.
+The tray's **Open Settings File** reveals the JSON in Explorer. After editing it, choose **Reload Settings**. A valid reload updates layout and hotkeys, preserves Restore history and pause state, and resets repeated-command cycles. Failed reloads retain the last working configuration. Unsaved GUI edits are preserved with an explicit reload prompt. There is no file watcher or background polling.
 
 Existing JSON files without a `hotkeys` section retain the original defaults. Individual entries can be set to `null` to disable a binding. See the [configuration reference](docs/SETTINGS.md) for the schema, gaps and reload details.
 
