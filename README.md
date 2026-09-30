@@ -44,7 +44,7 @@ An independent MIT-licensed implementation inspired by Rectangle's positioning w
 
 **Requires Windows 11 x64.** Release packages include the .NET runtime; users do not need to install .NET separately.
 
-Download the installer or portable ZIP from the [latest published GitHub release](https://github.com/Ken5998/PaneShift/releases/latest). **PaneShift v0.2.0** introduces optional Mac-style shortcuts; see the [0.2.0 release notes](docs/RELEASE_NOTES_0.2.0.md).
+Download the installer or portable ZIP from the [latest published GitHub release](https://github.com/Ken5998/PaneShift/releases/latest). **PaneShift v0.2.0 is currently a draft**, introducing optional Mac-style shortcuts. Publication is on hold for review of two installer antivirus detections; see the [validation record](docs/VALIDATION_0.2.0.md#release-hold-and-antivirus-investigation). The latest public release remains v0.1.1. See the [0.2.0 release notes](docs/RELEASE_NOTES_0.2.0.md).
 
 Or install/update from PowerShell without administrator rights:
 
