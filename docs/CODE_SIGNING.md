@@ -71,6 +71,8 @@ Select **report_only** to refresh the analysis IDs already recorded in the relea
 
 ## Privacy
 
-PaneShift itself does not transmit user information to network services as part of normal window-management functionality. Source inspection found no HTTP client, telemetry, update checker or network transport in the application projects. Settings remain in `%LOCALAPPDATA%\PaneShift\settings.json`; window placement history remains in memory for the session.
+PaneShift itself does not transmit user information to network services as part of window-management and optional shortcut-translation functionality. Source inspection found no HTTP client, telemetry, update checker or network transport in the application projects. Settings remain in `%LOCALAPPDATA%\PaneShift\settings.json`; window placement history remains in memory for the session.
 
 The explicit **GitHub repository** button opens the project URL in the user's browser. Browser requests and Windows certificate/reputation checks are outside PaneShift's window-management functionality. Optional VirusTotal submissions occur in the release workflow, not in the installed app. There is no auto-updater.
+
+The optional Mac-style feature uses a low-level keyboard hook only while enabled. It matches a fixed whitelist, ignores injected events and keeps only temporary consumed-key state until release. It does not log typed text or keyboard activity. Default window management continues using RegisterHotKey without a keyboard hook. Disabling, pausing or exiting removes the translation hook; no network, injection into processes, service or driver is introduced.

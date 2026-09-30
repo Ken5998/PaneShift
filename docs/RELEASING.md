@@ -2,7 +2,7 @@
 
 ## Version and build tools
 
-`Directory.Build.props` is the single local version source (currently `0.1.1`). A tagged release uses its validated `v<SemVer>` tag to pass `-p:Version=<SemVer>` through build/publish. Assembly/FileVersion use the three numeric components plus `.0`; ProductVersion and Settings show the complete semantic version. Numeric components must fit Windows metadata (0–65534). The manifest's fixed assembly identity is a loader identity, not the product version; its asInvoker, uiAccess and Per-Monitor V2 settings remain unchanged.
+`Directory.Build.props` is the single local version source (currently `0.2.0`). A tagged release uses its validated `v<SemVer>` tag to pass `-p:Version=<SemVer>` through build/publish. Assembly/FileVersion use the three numeric components plus `.0`; ProductVersion and Settings show the complete semantic version. Numeric components must fit Windows metadata (0–65534). The manifest's fixed assembly identity is a loader identity, not the product version; its asInvoker, uiAccess and Per-Monitor V2 settings remain unchanged.
 
 For every release, update the version, README, website feature descriptions and download references, and add `docs/RELEASE_NOTES_<version>.md` with `## Highlights` and `## Downloads` sections. The draft script includes that version's highlights automatically. Preserve historical release notes and screenshot version captions. Public download links should point to `/releases/latest` until version-specific assets are published and verified; never advertise a draft as available. Run the application tests, release-script checks and site build before committing and pushing.
 
@@ -34,10 +34,10 @@ WPF and native runtime files are shipped beside the executable, including requir
 ```text
 artifacts/
   portable/
-    PaneShift-0.1.0-win-x64/          # complete publish directory
-    PaneShift-0.1.0-win-x64.zip
+    PaneShift-0.2.0-win-x64/          # complete publish directory
+    PaneShift-0.2.0-win-x64.zip
   installer/
-    PaneShift-0.1.0-Setup-x64.exe
+    PaneShift-0.2.0-Setup-x64.exe
   SHA256SUMS.txt
 ```
 
@@ -66,11 +66,11 @@ Publish cleans only the selected version directory under artifacts, after path/j
 
 The draft remains unpublished for maintainer acceptance; publish it from GitHub after checking all assets and notes. Pre-release SemVer tags are also marked as GitHub prereleases. A rerun fails safely if the release tag already has a release; inspect/delete an incomplete **draft** before retrying. Do not replace assets of a published version—cut a new tag.
 
-No release/tag is created by local build scripts. To prepare the initial remote release after review and commit:
+No release/tag is created by local build scripts. To prepare the next remote release after review and commit:
 
 ```powershell
-git tag -a v0.1.0 -m 'PaneShift v0.1.0'
-git push origin v0.1.0
+git tag -a v0.2.0 -m 'PaneShift v0.2.0'
+git push origin v0.2.0
 ```
 
 Tag permissions should be restricted to maintainers. Configure SignPath and optional VirusTotal secrets only as described in [CODE_SIGNING.md](CODE_SIGNING.md). No IDs or credentials are pre-filled. Signing requires explicit opt-in; an unsigned draft is permitted and labeled accurately.
@@ -80,7 +80,7 @@ Tag permissions should be restricted to maintainers. Configure SignPath and opti
 Use a clean Windows 11 x64 VM without .NET installed for the final no-prerequisites check. Preserve a copy/hash of any existing settings before switching builds.
 
 1. Build/test and run `scripts/Test-ReleaseScripts.ps1`; inspect final hashes and metadata.
-2. Extract the ZIP into a new empty directory away from the source/build tree. Launch its EXE; verify one tray icon, branded Settings, version 0.1.0 and no SDK/runtime prompt.
+2. Extract the ZIP into a new empty directory away from the source/build tree. Launch its EXE; verify one tray icon, branded Settings, version 0.2.0 and no SDK/runtime prompt.
 3. Check shortcuts, layout gaps and settings persistence across exit/relaunch; also run the [application regression checklist](TESTING.md).
 4. Exit the portable copy. Install using a standard account, verify default per-user directory and no elevation prompt. Check Start Menu selected by default, desktop unselected, and optional launch.
 5. Verify the installed tray icon, Settings, shortcuts, persistence and standard privilege status.
@@ -152,4 +152,10 @@ The portable package requires its extracted folder to remain at the registered p
 - The installer, portable ZIP and SHA-256 checksums were generated and published by the release workflow. The release is unsigned and states that explicitly.
 - Manual acceptance confirmed horizontal cycling for thirds, two-thirds and top/bottom sixth shortcuts, including wraparound and reset behavior.
 - VirusTotal reports matched the published asset hashes and reported 0 malicious / 0 suspicious results from 68 engines for the installer and 65 engines for the ZIP at publication time. These results remain informational.
-- [PaneShift v0.1.1](https://github.com/Ken5998/PaneShift/releases/tag/v0.1.1) is published as the latest release.
+- [PaneShift v0.1.1](https://github.com/Ken5998/PaneShift/releases/tag/v0.1.1) was published as the latest release at that time.
+
+## 0.2.0 acceptance
+
+In addition to the checks above, run the full [Mac-style checklist](TESTING.md#mac-style-shortcuts-v020). Confirm the actual Windows override with physical keys before publishing; synthetic source events are intentionally ignored. Verify upgrade from 0.1.1 retains hotkeys, gaps, screen-edge settings and the exact startup Run value while leaving the new opt-in disabled. Do not alter AppId, installation directory or settings path. The installer replaces application files only and neither writes settings nor changes an existing startup entry during upgrade.
+
+Record local tests separately from final Actions-built artifact verification. Review actual signing/scan results rather than carrying forward v0.1.1 claims.

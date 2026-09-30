@@ -22,6 +22,8 @@ public partial class App : System.Windows.Application
     private bool ownsMutex;
     private HwndSource? source;
     private GlobalHotkeys? hotkeys;
+    private MacStyleShortcutService? macStyle;
+    private string? macStyleWarning;
     private Forms.NotifyIcon? tray;
     private ApplicationIcon? applicationIcon;
     private Forms.ContextMenuStrip? menu;
@@ -98,7 +100,8 @@ public partial class App : System.Windows.Application
             });
             source.AddHook(OnMessage);
             hotkeys = new GlobalHotkeys(source.Handle);
-            activation = new ConfigurationActivation(runtime, settingsStore, hotkeys);
+            macStyle = new MacStyleShortcutService(source.Handle);
+            activation = new ConfigurationActivation(runtime, settingsStore, hotkeys, macStyle);
             menu = new Forms.ContextMenuStrip();
             menu.Items.Add(new Forms.ToolStripMenuItem("PaneShift") { Enabled = false });
             menu.Items.Add(new Forms.ToolStripSeparator());
@@ -112,7 +115,7 @@ public partial class App : System.Windows.Application
             {
                 paused = pause.Checked;
                 windows.ResetRepetition();
-                if (paused) hotkeys?.ReleaseAll();
+                if (paused) { hotkeys?.ReleaseAll(); macStyle?.Commit(false); }
                 else RegisterShortcuts();
                 if (tray is not null) tray.Text = paused ? "PaneShift — paused" : "PaneShift";
                 RefreshSettingsStatus();
@@ -163,12 +166,22 @@ public partial class App : System.Windows.Application
     private void RegisterShortcuts()
     {
         failures = hotkeys!.Register(HotkeySettings.Resolve(runtime.Current));
+        macStyleWarning = macStyle!.Prepare(runtime.Current.MacStyleShortcuts.Enabled);
+        if (macStyleWarning is null) macStyle.Commit(runtime.Current.MacStyleShortcuts.Enabled);
+        else Notify(macStyleWarning);
         if (failures.Count > 0)
             Notify($"{failures.Count} shortcut(s) could not be registered. Open Shortcuts and status for details.");
     }
 
     private nint OnMessage(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
     {
+        if (message == MacStyleShortcutService.InputFailedMessage)
+        {
+            handled = true;
+            lastCommandFailure = "Windows did not accept the translated shortcut. Elevated apps require Restart as administrator; protected windows may remain inaccessible.";
+            Notify(lastCommandFailure);
+            return 0;
+        }
         if (message != GlobalHotkeys.HotkeyMessage || paused || hotkeys is null ||
             !hotkeys.TryGetBinding((int)wParam, out var binding) || binding is null) return 0;
         handled = true;
@@ -196,6 +209,9 @@ public partial class App : System.Windows.Application
             text += "\n\nRegistration failures:\n" + string.Join("\n", failures.Select(f =>
                 $"{FormatShortcut(f.Binding)} — {f.Binding.Action}: {f.Reason}"));
         if (settingsWarning is not null) text += "\n\n" + settingsWarning;
+        if (macStyleWarning is not null) text += "\n\n" + macStyleWarning;
+        if (runtime.Current.MacStyleShortcuts.Enabled)
+            text += "\n\nMac-style shortcuts:\n" + string.Join("\n", MacStyleShortcuts.All.Select(m => $"{m.SourceDisplay} → {m.TargetDisplay} — {m.Name}"));
         if (hotkeys?.CleanupWarning is { } cleanup) text += "\n\n" + cleanup;
         if (privilegeWarning is not null) text += "\n\n" + privilegeWarning;
         if (lastCommandFailure is not null) text += "\n\nLast window command failure:\n" + lastCommandFailure;
@@ -246,6 +262,7 @@ public partial class App : System.Windows.Application
             return;
         }
         failures = [];
+        macStyleWarning = null;
         settingsWindow?.ViewModel.ExternalReload(runtime.Current);
         RefreshSettingsStatus();
         tray?.ShowBalloonTip(4000, "PaneShift — Settings reloaded", DescribeSettings(), Forms.ToolTipIcon.Info);
@@ -272,7 +289,7 @@ public partial class App : System.Windows.Application
     private string? ApplySettings(PaneShiftSettings candidate)
     {
         var error = activation!.Apply(candidate, persist: true, paused);
-        if (error is null) { settingsWarning = null; failures = []; }
+        if (error is null) { settingsWarning = null; macStyleWarning = null; failures = []; }
         RefreshSettingsStatus();
         return error;
     }
@@ -283,6 +300,7 @@ public partial class App : System.Windows.Application
         settingsWindow.ViewModel.RuntimeStatus =
             $"Shortcut status: {(paused ? "Paused" : "Active")}\nPrivilege level: {(isElevated is true ? "Administrator" : isElevated is false ? "Standard" : "Unknown")}" +
             (failures.Count > 0 ? $"\n{failures.Count} shortcut(s) unavailable. See Shortcuts and status in the tray." : "") +
+            (macStyleWarning is { } macWarning ? $"\n{macWarning}" : "") +
             (hotkeys?.CleanupWarning is { } warning ? $"\n{warning}" : "");
     }
 
@@ -340,6 +358,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(System.Windows.ExitEventArgs e)
     {
+        macStyle?.Dispose();
         hotkeys?.Dispose();
         if (source is not null) { source.RemoveHook(OnMessage); source.Dispose(); }
         tray?.Dispose();

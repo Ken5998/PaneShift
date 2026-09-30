@@ -110,6 +110,29 @@
                     <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="Repeated commands" Style="{StaticResource Heading}"/><TextBlock Text="Half shortcuts cycle sizes:"/><TextBlock Text="1/2 → 2/3 → 1/3" FontSize="20" Foreground="{DynamicResource AccentBrush}" Margin="0,10,0,8"/><TextBlock Text="Third, two-thirds and sixth shortcuts cycle horizontally in the same row." Foreground="{DynamicResource MutedBrush}"/></StackPanel></Border>
                 </StackPanel></ScrollViewer>
             </TabItem>
+            <TabItem Header="_Keyboard">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,8,12,0"><StackPanel>
+                    <Border Style="{StaticResource Card}"><StackPanel>
+                        <TextBlock Text="Mac-style shortcuts" Style="{StaticResource Heading}"/>
+                        <TextBlock Text="Use the Windows key like Command on macOS for common application shortcuts." Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,16"/>
+                        <CheckBox Content="_Enable Mac-style shortcuts" IsChecked="{Binding MacStyleEnabled}"/>
+                        <TextBlock Text="Changes take effect when you Apply. Off by default." Foreground="{DynamicResource MutedBrush}" Margin="22,8,0,16"/>
+                        <TextBlock Text="Some Windows shortcuts such as Win+V, Win+A, Win+S and Win+W are replaced while enabled. Other Windows shortcuts keep working."/>
+                    </StackPanel></Border>
+                    <Border Style="{StaticResource Card}"><StackPanel>
+                        <TextBlock Text="Application shortcuts" Style="{StaticResource Heading}"/>
+                        <ItemsControl ItemsSource="{Binding MacStyleMappings}"><ItemsControl.ItemTemplate><DataTemplate>
+                            <Grid Margin="0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="170"/><ColumnDefinition Width="170"/></Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding Name}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding SourceDisplay}" Foreground="{DynamicResource AccentBrush}"/>
+                                <TextBlock Grid.Column="2" Text="{Binding TargetDisplay, StringFormat=→ {0}}" Foreground="{DynamicResource MutedBrush}"/>
+                            </Grid>
+                        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                        <TextBlock Text="Win+W closes a tab or document where Ctrl+W is supported. Win+Q sends Alt+F4, keeping save prompts and normal cleanup; it never forcibly terminates an application." Foreground="{DynamicResource MutedBrush}" Margin="0,16,0,0"/>
+                        <TextBlock Text="For elevated apps, use Restart as administrator. Pause shortcuts from the tray when needed for games or fullscreen apps." Foreground="{DynamicResource MutedBrush}" Margin="0,12,0,0"/>
+                    </StackPanel></Border>
+                </StackPanel></ScrollViewer>
+            </TabItem>
             <TabItem Header="_General">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,8,12,0"><StackPanel>
                     <Border Style="{StaticResource Card}" DataContext="{Binding LoginStartup}"><StackPanel>

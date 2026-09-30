@@ -63,3 +63,22 @@ UAC acceptance/cancellation, integrity boundaries and the live single-instance h
 2. Parse the script with Windows PowerShell 5.1 and PowerShell 7. Run it as a script block with `-WhatIf` against the latest public release; verify that the installer and checksums download, SHA-256 succeeds, and PaneShift is neither stopped nor installed. The release-script tests must also verify that `$PSCmdlet` is only referenced inside an advanced function, which keeps the short `irm | iex` entry point valid without executing that security-sensitive pattern during routine development.
 3. Test a real install and update with PaneShift running: the process must close only after verification, the installed version must match the release, and PaneShift must restart unless `-NoLaunch` was supplied.
 4. Run it again at the current version and verify it reports the existing installation without stopping or reinstalling PaneShift. Use `-Force -WhatIf` to exercise the reinstall path without changing the installation.
+
+## Mac-style shortcuts (v0.2.0)
+
+Use physical keys: PaneShift deliberately ignores synthetic/injected source events. Run with standard privileges first. Use disposable documents/tabs and keep unsaved-work prompts enabled in the editor.
+
+1. Upgrade from 0.1.1 with a custom shortcut and gap saved; verify both persist, startup registration is unchanged and Keyboard → Mac-style shortcuts is off. Old JSON must not be rewritten just by starting.
+2. Toggle on without Apply: native Win+V/A/S/W must still work. Cancel and reopen: off. Enable + Apply: all twelve mappings activate together. Reopen to verify persistence.
+3. Chrome/Edge (and Firefox when available): Win+C copies selected text, Win+V pastes, Win+T opens a tab, Win+Shift+T restores a closed tab, Win+W closes only the current tab, Win+Q behaves like Alt+F4. Hold W: only one tab closes. Keep Win held, release/repress T or W: each new letter press acts once. Start must not open after releasing Win.
+4. File Explorer with multiple tabs: Win+W closes the current tab, Win+C/V copy/paste test files, Win+Q closes the window normally. Use a temporary folder.
+5. Editor: Win+A/C/X/V/Z/Shift+Z/S/F match Ctrl+A/C/X/V/Z/Shift+Z/S/F. Check application-specific redo behavior against physical Ctrl+Shift+Z. With an unsaved document, Win+Q must behave exactly like Alt+F4 (including the app's save/session policy); verify cancellation leaves the app usable.
+6. Check left and right Win, left and right Shift, both Shift keys, release Win before the letter, and Shift release before Z/T. After every case, type normally and use native Ctrl/Alt chords: no stuck modifiers. While holding Win after a mapped chord, press E or R: native behavior remains.
+7. With the feature on, verify Win+V/A/S/W use the mapped behavior. With off + Apply, verify Clipboard History, Quick Settings, Search and Widgets return immediately. Repeat pause/resume, explicit Reload and app restart. Exit must restore native behavior.
+8. In both states verify Win+E, Win+R, Win+L (save work before locking), Win+D, Win+Tab, Win+number and native arrows. PaneShift's configured Ctrl+Alt window layouts and Ctrl+Shift+Win sixths must still work.
+9. Enter a conflicting window binding (e.g. Center = Win+W) in JSON with Mac-style enabled: Reload must fail and retain the previous working configuration. Test invalid enabled values/null section. GUI Restore defaults must disable the feature only after Apply; startup opt-in remains independent.
+10. Verify Keyboard page in light/dark themes, minimum window size and 100/125/150% DPI, including scrolling to the last mapping. Check Apply/Cancel, dirty external reload, pause and reset.
+11. Test elevated editor with standard PaneShift: no unexpected native source action or stuck keys; input may be rejected with a status notification. Repeat after explicit administrator restart. No privilege escalation should happen automatically.
+12. Test fullscreen/game and another keyboard utility where available. Only exact mappings should be intercepted; pause for incompatible software. Hook ordering and raw-input behavior cannot be guaranteed by mock tests.
+
+Record actual manual results per release; automated state/sequence tests are not evidence that Chrome, Explorer or a game accepted the physical keys.

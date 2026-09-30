@@ -12,6 +12,9 @@ Settings are read at startup and on explicit **Reload Settings** from `%LOCALAPP
 {
   "gapPixels": 0,
   "applyGapToScreenEdges": false,
+  "macStyleShortcuts": {
+    "enabled": false
+  },
   "repeatedCommands": {
     "halfActions": "cycleSizes"
   }
@@ -45,3 +48,11 @@ Missing properties inherit defaults and unknown top-level properties are ignored
 `gapPixels` is a nonnegative count of **physical pixels**, applied to the visible window frame after the ideal tile is calculated. Zero preserves the original ideal geometry. An internal leading edge receives `floor(gap/2)` inset and an internal trailing edge receives `ceil(gap/2)`: adjacent windows have exactly the configured gap, including odd values. There is no cumulative inset across commands. With `applyGapToScreenEdges: false`, outer edges stay flush with the work area; with `true`, outer edges receive the full gap. Taskbar space stays excluded.
 
 The generic transformation applies to all tiled layouts and repeated half sizes. Maximize, Center, and Restore retain their existing behavior without gap transformation. If a gap would eliminate a tile's width or height, the command is rejected before changing the window, with a tray notification; reduce the gap for that work area. Target applications may still enforce minimum sizes that override the requested geometry.
+
+## Mac-style shortcuts
+
+`macStyleShortcuts.enabled` is a Boolean, default `false`. Missing sections and missing `enabled` inherit this default; a null/non-object section or non-Boolean value is invalid. No migration or manual JSON editing is required. **Settings → Keyboard** edits this flag as part of the existing draft. Apply persists/activates, Cancel discards, and Restore defaults sets it to false only after Apply. Reset shortcuts on the Shortcuts page affects only window-management bindings.
+
+The [fixed mapping table](../README.md#mac-style-shortcuts) is not independently configurable. All twelve mappings become active together; none are intercepted while disabled or paused. Window-management bindings conflicting with the whitelist are rejected before saving when enabled. The hook is prepared before saving and only activated after commit; registration, hook installation or file errors preserve the previous state. Reload follows the same path. A paused Apply probes hook installation but never enables translations and releases it afterward.
+
+Enabling overrides native Win+V/A/S/W and the other listed combinations. Win+W sends Ctrl+W, and Win+Q sends graceful Alt+F4, never process termination. Startup preference remains the separate Windows setting above and is unaffected by this JSON flag or an upgrade.

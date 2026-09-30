@@ -28,6 +28,10 @@ public static class HotkeySettings
         foreach (var group in bindings.GroupBy(b => new HotkeyChord(b.Modifiers, b.VirtualKey)))
             if (group.Count() > 1)
                 throw new ArgumentException($"{group.Key.Display} is assigned to both {string.Join(" and ", group.Select(b => ActionCatalog.Get(b.Action).Name))}.");
+        if (settings.MacStyleShortcuts?.Enabled == true)
+            foreach (var binding in bindings)
+                if (MacStyleShortcuts.Find(new(binding.Modifiers, binding.VirtualKey)) is { } translation)
+                    throw new ArgumentException($"{translation.Source.Display} is reserved for Mac-style {translation.Name}. Change the window shortcut or disable Mac-style shortcuts.");
         return bindings.AsReadOnly();
     }
 

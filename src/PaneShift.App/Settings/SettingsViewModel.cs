@@ -26,6 +26,7 @@ public sealed class SettingsViewModel : ObservableObject
     private bool loading;
     private string gapText = "0";
     private bool edges;
+    private bool macStyleEnabled;
     private string feedback = "";
     private string validation = "";
     private string status = "";
@@ -36,6 +37,8 @@ public sealed class SettingsViewModel : ObservableObject
     public string GapText { get => gapText; set { gapText = value; Edited(); Changed(nameof(GapValue)); } }
     public double GapValue { get => int.TryParse(gapText, out int n) ? Math.Clamp(n, 0, 64) : 0; set => GapText = ((int)value).ToString(CultureInfo.InvariantCulture); }
     public bool ApplyGapToScreenEdges { get => edges; set { edges = value; Edited(); } }
+    public bool MacStyleEnabled { get => macStyleEnabled; set { macStyleEnabled = value; Edited(); } }
+    public IReadOnlyList<ShortcutTranslation> MacStyleMappings => MacStyleShortcuts.All;
     public string Validation => validation;
     public string Feedback => feedback;
     public bool HasChanges => Fingerprint() != baselineFingerprint;
@@ -61,6 +64,7 @@ public sealed class SettingsViewModel : ObservableObject
         baseline = settings;
         gapText = settings.GapPixels.ToString(CultureInfo.InvariantCulture);
         edges = settings.ApplyGapToScreenEdges;
+        macStyleEnabled = settings.MacStyleShortcuts.Enabled;
         var bindings = HotkeySettings.Resolve(settings);
         foreach (var row in Rows)
         {
@@ -74,7 +78,7 @@ public sealed class SettingsViewModel : ObservableObject
         Refresh();
     }
 
-    private string Fingerprint() => $"{gapText}|{edges}|" + string.Join("|", Rows.Select(r => r.Chord ?? "-"));
+    private string Fingerprint() => $"{gapText}|{edges}|{macStyleEnabled}|" + string.Join("|", Rows.Select(r => r.Chord ?? "-"));
 
     public PaneShiftSettings CreateCandidate()
     {
@@ -82,7 +86,8 @@ public sealed class SettingsViewModel : ObservableObject
             throw new ArgumentException("Enter a non-negative whole number of pixels (0–2147483647).");
         var map = ImmutableSortedDictionary.CreateBuilder<string, string?>(StringComparer.Ordinal);
         foreach (var row in Rows) map[row.Definition.Id] = row.Chord;
-        var candidate = baseline with { GapPixels = gap, ApplyGapToScreenEdges = edges, Hotkeys = map.ToImmutable() };
+        var candidate = baseline with { GapPixels = gap, ApplyGapToScreenEdges = edges, Hotkeys = map.ToImmutable(),
+            MacStyleShortcuts = new() { Enabled = macStyleEnabled } };
         candidate.Validate();
         return candidate;
     }
@@ -99,6 +104,7 @@ public sealed class SettingsViewModel : ObservableObject
         try { _ = CreateCandidate(); validation = ""; }
         catch (ArgumentException ex) { validation = ex.Message; }
         Changed(nameof(GapText)); Changed(nameof(GapValue)); Changed(nameof(ApplyGapToScreenEdges));
+        Changed(nameof(MacStyleEnabled));
         Changed(nameof(HasChanges)); Changed(nameof(HasExternalChange)); Changed(nameof(CanApply));
         Changed(nameof(Validation)); Changed(nameof(Feedback));
         ApplyCommand.Refresh();
@@ -129,7 +135,7 @@ public sealed class SettingsViewModel : ObservableObject
         Edited();
     }
 
-    public void RestoreDefaults() { gapText = "0"; edges = false; ResetShortcuts(); }
+    public void RestoreDefaults() { gapText = "0"; edges = false; macStyleEnabled = false; ResetShortcuts(); }
 
     public void ExternalReload(PaneShiftSettings settings)
     {
