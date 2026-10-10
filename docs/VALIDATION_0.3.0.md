@@ -62,6 +62,23 @@ An ignored compiled probe called the production `UpdateInstaller.StartHelper` ag
 
 After another normal tray exit, the probe called production `RunHelperAsync` with a valid staged job and an intentionally incorrect SHA-256. It returned the verification-failed result, did not create an installer log or execute the MSI, and restarted the installed copy. JSON and startup again matched the baseline. The probe and staged evidence are ignored local validation files, not shipped code.
 
-Remaining checks: Inno migration with startup off/foreign registration on a separate device; native Windows uninstall-entry/startup-list inspection; real MSI major upgrade/downgrade refusal and rollback; successful future-version installation through the helper; final portable launch; light theme/DPI and remaining standard-user device acceptance; verification and antivirus review of any different final Actions-built hashes. The [trial MSI acceptance](MSI_TRIAL.md) does not transfer to the new package/custom actions.
+Remaining checks: Inno migration with startup off/foreign registration on a separate device; native Windows uninstall-entry/startup-list inspection; real MSI major upgrade/downgrade refusal and rollback; successful future-version installation through the helper; final portable launch; light theme/DPI and remaining standard-user device acceptance. The [trial MSI acceptance](MSI_TRIAL.md) does not transfer to the new package/custom actions.
 
-The maintainer lifted the publication hold for v0.3.0 after reviewing these local package results. The release will use the existing tag-triggered workflow and its exact final artifacts; different hashes require their own verification and scan review before publication. Public submission of the local MSI and ZIP occurred only after explicit authorization, as recorded above. Automated checks do not establish successful future-release installation or complete device acceptance.
+The maintainer lifted the publication hold for v0.3.0 after reviewing the local package results. Final Actions-built hashes were separately verified and reviewed before the authorized publication below. Public submissions occurred only after explicit authorization. Automated checks do not establish successful future-release installation or complete device acceptance.
+
+## Published Actions artifacts — 2026-10-10
+
+[Release workflow 38069575803](https://github.com/Ken5998/PaneShift/actions/runs/38069575803) completed restore, Release build, all **662 tests** (573 Core, 89 Windows/App), script checks, self-contained publication, MSI/ZIP packaging and verification. Application and installer builds had zero warnings/errors. CI on the same source also passed. Tag `v0.3.0` targets `e1b4847513ac76cda14f1fc62a62ed31b6492ff0`.
+
+| Published artifact | SHA-256 | Bytes |
+| --- | --- | --- |
+| PaneShift-0.3.0-Setup-x64.msi | `8f0fd9eca0ece29f86efc81494176635155aedc6d57e824db79101abd66ffeb8` | 58,639,064 |
+| PaneShift-0.3.0-win-x64.zip | `2db3b0157d7797bfe622d574c7cb9c600fad84814fc83b92cf57caee47233949` | 76,144,776 |
+
+The downloaded files matched both the workflow's `SHA256SUMS.txt` and GitHub asset digests. The extracted ZIP has 478 files, product version 0.3.0 and an included runtime. Application and MSI are unsigned. The final MSI ProductCode is `{9D8968F4-FC48-4F04-9823-E077C7F3F6ED}`. Local Defender scanned this exact MSI and reported no threats. Local-package results above were not substituted for these new hashes.
+
+The workflow submitted both exact final files. [Report refresh 38070094105](https://github.com/Ken5998/PaneShift/actions/runs/38070094105) read the existing analyses without another upload and recorded zero malicious and zero suspicious results for each. The completed web reports showed [MSI 0/59](https://www.virustotal.com/gui/file/8f0fd9eca0ece29f86efc81494176635155aedc6d57e824db79101abd66ffeb8/detection) and [ZIP 0/61](https://www.virustotal.com/gui/file/2db3b0157d7797bfe622d574c7cb9c600fad84814fc83b92cf57caee47233949/detection). MSI had two timeouts and 14 unsupported-type results; ZIP had four timeouts, seven unsupported-type results and two failures. DeepInstinct could not process the MSI and reported Undetected for the ZIP. This does not resolve its historical EXE detection or prove every archived file was scanned.
+
+[PaneShift v0.3.0](https://github.com/Ken5998/PaneShift/releases/tag/v0.3.0) was published as a stable latest release at 19:04 Europe/Zurich. The older v0.2.0 draft/tag/assets remain unchanged. Final workflow logs, downloaded files, hash checks and report snapshots are retained under ignored `artifacts/github-v0.3.0`.
+
+After publication, a compiled probe used the production `ReleaseClient` against the anonymous public endpoint: version 0.3.0 offered no newer release; version 0.2.0 received v0.3.0 with the exact MSI/ZIP digests above. The same client downloaded the public MSI through the permitted redirects and successfully verified its size and SHA-256. It did not execute the MSI or change the installed copy. This validates the public metadata/download path, not a successful future-version installation.
