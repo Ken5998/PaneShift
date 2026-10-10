@@ -32,6 +32,7 @@ jobs:
           if (-not $env:RELEASE_TAG.StartsWith('v') -or $env:RELEASE_TAG.Length -le 1) { throw 'Expected v-prefixed semantic version tag.' }
           $version = Get-ReleaseVersion $env:RELEASE_TAG.Substring(1)
           "version=$version" >> $env:GITHUB_OUTPUT
+          "INSTALLER_NAME=$(Get-InstallerFileName $version)" >> $env:GITHUB_ENV
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: 10.0.x
@@ -96,8 +97,10 @@ jobs:
           Copy-Item -LiteralPath $signed -Destination (Join-Path (Get-PublishDirectory $env:RELEASE_VERSION) 'PaneShift.App.exe') -Force
       - name: Install pinned Inno Setup compiler
         run: |
-          $iscc = ./scripts/Install-InnoSetup.ps1
-          "ISCC_PATH=$iscc" >> $env:GITHUB_ENV
+          if ($env:INSTALLER_NAME.EndsWith('.exe')) {
+            $iscc = ./scripts/Install-InnoSetup.ps1
+            "ISCC_PATH=$iscc" >> $env:GITHUB_ENV
+          }
       - name: Package signed application or unsigned preview
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
@@ -108,7 +111,7 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: unsigned-installer
-          path: artifacts/installer/PaneShift-${{ steps.version.outputs.version }}-Setup-x64.exe
+          path: artifacts/installer/${{ env.INSTALLER_NAME }}
           if-no-files-found: error
           retention-days: 1
       - name: Sign installer with SignPath
@@ -129,7 +132,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           . ./scripts/Release.Common.ps1
-          $signed = "artifacts/signed-installer/PaneShift-$env:RELEASE_VERSION-Setup-x64.exe"
+          $signed = "artifacts/signed-installer/$env:INSTALLER_NAME"
           Assert-Authenticode $signed
           Copy-Item -LiteralPath $signed -Destination 'artifacts/installer' -Force
       - name: Verify final artifacts and generate SHA-256 checksums
@@ -143,7 +146,7 @@ jobs:
         run: |
           New-Item -ItemType Directory artifacts/release | Out-Null
           Copy-Item "artifacts/portable/PaneShift-$env:RELEASE_VERSION-win-x64.zip" artifacts/release
-          Copy-Item "artifacts/installer/PaneShift-$env:RELEASE_VERSION-Setup-x64.exe" artifacts/release
+          Copy-Item "artifacts/installer/$env:INSTALLER_NAME" artifacts/release
           Copy-Item artifacts/SHA256SUMS.txt, artifacts/signing-status.txt artifacts/release
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:

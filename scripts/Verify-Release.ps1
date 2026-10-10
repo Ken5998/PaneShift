@@ -38,10 +38,14 @@ if ($RequireSigned) { Assert-Authenticode $exe }
 if ($PublishOnly) { Write-Host "Verified self-contained win-x64 publish $Version ($($files.Count) files)."; return }
 
 $zip = Join-Path $ArtifactsRoot "portable/PaneShift-$Version-win-x64.zip"
-$setup = Join-Path $ArtifactsRoot "installer/PaneShift-$Version-Setup-x64.exe"
+$setup = Join-Path $ArtifactsRoot ("installer/" + (Get-InstallerFileName $Version))
 if (-not (Test-Path -LiteralPath $setup)) { throw 'Installer missing.' }
-$installerMetadata = [Diagnostics.FileVersionInfo]::GetVersionInfo($setup)
-if ($installerMetadata.ProductVersion.Trim() -ne $Version -or $installerMetadata.FileVersion.Trim() -ne $numericVersion) { throw 'Installer version mismatch.' }
+if ($setup.EndsWith('.msi')) {
+    & "$PSScriptRoot/Verify-Msi.ps1" -Version $Version
+} else {
+    $installerMetadata = [Diagnostics.FileVersionInfo]::GetVersionInfo($setup)
+    if ($installerMetadata.ProductVersion.Trim() -ne $Version -or $installerMetadata.FileVersion.Trim() -ne $numericVersion) { throw 'Installer version mismatch.' }
+}
 if ($RequireSigned) { Assert-Authenticode $setup }
 $archive = [IO.Compression.ZipFile]::OpenRead($zip)
 try {

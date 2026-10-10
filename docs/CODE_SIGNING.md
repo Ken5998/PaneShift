@@ -8,7 +8,7 @@ Official PaneShift release artifacts are built from tagged source in [Ken5998/Pa
 
 The planned downloadable files are:
 
-- `PaneShift-<version>-Setup-x64.exe`
+- `PaneShift-<version>-Setup-x64.msi` (from 0.3.0; historical releases use `.exe`)
 - `PaneShift-<version>-win-x64.zip`
 - `SHA256SUMS.txt`, computed from the final installer and ZIP after signing (if enabled).
 
@@ -40,7 +40,7 @@ Configure only after acceptance and a reviewed test signing run:
 | `SIGNPATH_INSTALLER_ARTIFACT_SLUG` | Repository variable | Artifact configuration for the installer request |
 | `SIGNPATH_ENABLED` | Repository variable | Explicit opt-in (`true`) after configuration |
 
-The application artifact is a GitHub-generated ZIP containing `PaneShift.App.exe`. The installer artifact is another ZIP containing `PaneShift-<version>-Setup-x64.exe`. SignPath configurations must use a ZIP root and select the corresponding PE executable; the returned extracted files must retain those names. Configure **SHA-256 file digests and RFC 3161 timestamping** in the signing policy. Confirm the returned signature/timestamp algorithms in the pilot release before enabling the production policy. The repository contains no assumed IDs, tokens, certificate files or policy values.
+The application artifact is a GitHub-generated ZIP containing `PaneShift.App.exe`. The installer artifact is another ZIP containing `PaneShift-<version>-Setup-x64.msi` (from 0.3.0; historical releases use `.exe`). SignPath configurations must use a ZIP root and select the application PE executable or the MSI installer as appropriate; update and validate the installer artifact configuration before enabling signing for MSI; the returned extracted files must retain those names. Configure **SHA-256 file digests and RFC 3161 timestamping** in the signing policy. Confirm the returned signature/timestamp algorithms in the pilot release before enabling the production policy. The repository contains no assumed IDs, tokens, certificate files or policy values.
 
 Protect release tags and changes to workflows/scripts. Limit signing-token access to release maintainers and configure SignPath build-origin verification and approval rules. Normal PR and main-branch CI never receives these secrets and always builds unsigned app binaries. GitHub Actions permissions default to read-only; only the release-creation job gets `contents: write`.
 
@@ -50,7 +50,7 @@ Release verification requires a trusted, timestamped Authenticode signature when
 
 ```powershell
 signtool verify /pa /all /v path\to\PaneShift.App.exe
-signtool verify /pa /all /v path\to\PaneShift-0.1.0-Setup-x64.exe
+signtool verify /pa /all /v path\to\PaneShift-0.3.0-Setup-x64.msi
 ```
 
 If an authorized local certificate is used instead, keep it in an appropriate certificate store/hardware provider and use `signtool sign /sha1 <certificate-thumbprint> /fd SHA256 /tr <RFC3161-timestamp-URL> /td SHA256 <file>`. Supply real provider values yourself. Sign the application **before** `Package-Release.ps1`, sign the installer afterward, then run `Verify-Release.ps1 -RequireSigned`. Never put a password, private key, PFX or token in the repository, command logs or release assets. Local signing is an alternative maintenance procedure, not a required CI dependency.
@@ -71,8 +71,8 @@ Select **report_only** to refresh the analysis IDs already recorded in the relea
 
 ## Privacy
 
-PaneShift itself does not transmit user information to network services as part of window-management and optional shortcut-translation functionality. Source inspection found no HTTP client, telemetry, update checker or network transport in the application projects. Settings remain in `%LOCALAPPDATA%\PaneShift\settings.json`; window placement history remains in memory for the session.
+PaneShift itself does not transmit user information to network services as part of window-management and optional shortcut-translation functionality. The opt-in update feature contacts the fixed GitHub release endpoint and release CDN only when a check/download is requested or enabled; no settings, keyboard activity, window information or telemetry are sent. See [update privacy and behavior](UPDATES.md). Settings remain in `%LOCALAPPDATA%\PaneShift\settings.json`; window placement history remains in memory for the session.
 
-The explicit **GitHub repository** button opens the project URL in the user's browser. Browser requests and Windows certificate/reputation checks are outside PaneShift's window-management functionality. Optional VirusTotal submissions occur in the release workflow, not in the installed app. There is no auto-updater.
+The explicit **GitHub repository** button opens the project URL in the user's browser. Browser requests and Windows certificate/reputation checks are outside PaneShift's window-management functionality. Optional VirusTotal submissions occur in the release workflow, not in the installed app. Updates are installed only on explicit user request; no unattended installation is performed.
 
 The optional Mac-style feature uses a low-level keyboard hook only while enabled. It matches a fixed whitelist, ignores injected events and keeps only temporary consumed-key state until release. It does not log typed text or keyboard activity. Default window management continues using RegisterHotKey without a keyboard hook. Disabling, pausing or exiting removes the translation hook; no network, injection into processes, service or driver is introduced.

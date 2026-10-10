@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <!-- Separate product identity and paths until MSI migration has been accepted. -->
+  <Package Name="PaneShift (MSI trial)" Manufacturer="Kenan Kasumović"
+           Version="$(var.AppVersion)" Language="1033" Codepage="1250" Scope="perUser"
+           UpgradeCode="B7F47094-9D10-44FD-A68B-B4DB9AE77D38">
+    <SummaryInformation Description="PaneShift MSI packaging trial" Codepage="1250" />
+    <MajorUpgrade DowngradeErrorMessage="A newer PaneShift MSI trial is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <Icon Id="PaneShiftIcon" SourceFile="$(var.ProjectRoot)\assets\paneshift.ico" />
+    <Property Id="ARPPRODUCTICON" Value="PaneShiftIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/Ken5998/PaneShift" />
+    <Property Id="MSIRESTARTMANAGERCONTROL" Value="Disable" />
+    <Property Id="WINDOWS_CURRENT_BUILD">
+      <RegistrySearch Id="WindowsBuildSearch" Root="HKLM"
+                      Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+                      Name="CurrentBuildNumber" Type="raw" Bitness="always64" />
+    </Property>
+    <Launch Condition="Installed OR (VersionNT64 AND WINDOWS_CURRENT_BUILD &gt;= 22000)"
+            Message="PaneShift requires Windows 11 x64 or later." />
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="TrialProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="PaneShift-MSI-Trial" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="TrialShortcut" Guid="*">
+        <Shortcut Id="TrialStartMenuShortcut" Name="PaneShift (MSI trial)"
+                  Target="[INSTALLFOLDER]PaneShift.App.exe" WorkingDirectory="INSTALLFOLDER"
+                  Icon="PaneShiftIcon" />
+        <RegistryValue Root="HKCU" Key="Software\PaneShift\MsiTrial"
+                       Name="Shortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+    <Feature Id="Application" Title="PaneShift" Level="1">
+      <ComponentGroupRef Id="TrialPayload" />
+      <ComponentRef Id="TrialShortcut" />
+    </Feature>
+    <ui:WixUI Id="WixUI_Minimal" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+  </Package>
+</Wix>

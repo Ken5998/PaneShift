@@ -5,7 +5,7 @@ on:
       version:
         description: Existing release version (without v)
         required: true
-        default: '0.2.0'
+        default: '0.3.0'
       report_only:
         description: Refresh existing analysis results without uploading again
         type: boolean
@@ -38,8 +38,9 @@ jobs:
         run: |
           . ./scripts/Release.Common.ps1
           $version = Get-ReleaseVersion $env:RELEASE_VERSION
+          $installerName = Get-InstallerFileName $version
           New-Item -ItemType Directory artifacts/release | Out-Null
-          gh release download "v$version" --repo $env:RELEASE_REPOSITORY --dir artifacts/release --pattern "PaneShift-$version-Setup-x64.exe" --pattern "PaneShift-$version-win-x64.zip" --pattern SHA256SUMS.txt
+          gh release download "v$version" --repo $env:RELEASE_REPOSITORY --dir artifacts/release --pattern $installerName --pattern "PaneShift-$version-win-x64.zip" --pattern SHA256SUMS.txt
           if ($LASTEXITCODE -ne 0) { throw 'Could not download existing release assets.' }
           $json = gh release view "v$version" --repo $env:RELEASE_REPOSITORY --json body
           if ($LASTEXITCODE -ne 0) { throw 'Could not read release notes.' }

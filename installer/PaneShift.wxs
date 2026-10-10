@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="PaneShift" Manufacturer="Kenan Kasumović" Version="$(var.AppVersion)"
+           Language="1033" Codepage="1250" Scope="perUser" UpgradeCode="F7E15B50-EF68-4EB4-8889-C91277EA6B89">
+    <SummaryInformation Description="PaneShift Setup" Codepage="1250" />
+    <MajorUpgrade DowngradeErrorMessage="A newer PaneShift version is already installed." Schedule="afterInstallInitialize" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <Icon Id="PaneShiftIcon" SourceFile="$(var.ProjectRoot)\assets\paneshift.ico" />
+    <Property Id="ARPPRODUCTICON" Value="PaneShiftIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://paneshift.ksmvc.ch/" />
+    <Property Id="MSIRESTARTMANAGERCONTROL" Value="Disable" />
+    <Property Id="STARTUP_COMMAND" Secure="yes" Hidden="yes">
+      <RegistrySearch Id="StartupCommandSearch" Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="PaneShift" Type="raw" Bitness="always64" />
+    </Property>
+    <Property Id="LEGACY_LOCATION" Secure="yes">
+      <RegistrySearch Id="LegacyLocationSearch" Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\{84308E17-6F94-43D7-9367-38DD674BB41E}_is1" Name="InstallLocation" Type="raw" Bitness="always64" />
+    </Property>
+    <Property Id="LEGACY_UNINSTALL" Secure="yes" Hidden="yes">
+      <RegistrySearch Id="LegacyUninstallSearch" Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\{84308E17-6F94-43D7-9367-38DD674BB41E}_is1" Name="UninstallString" Type="raw" Bitness="always64" />
+    </Property>
+    <Property Id="WINDOWS_CURRENT_BUILD"><RegistrySearch Id="WindowsBuildSearch" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="CurrentBuildNumber" Type="raw" Bitness="always64" /></Property>
+    <Launch Condition="Installed OR (VersionNT64 AND WINDOWS_CURRENT_BUILD &gt;= 22000)" Message="PaneShift requires Windows 11 x64 or later." />
+    <StandardDirectory Id="LocalAppDataFolder"><Directory Id="ProgramsFolder" Name="Programs"><Directory Id="INSTALLFOLDER" Name="PaneShift-MSI">
+      <Component Id="InstallationMarker" Guid="*">
+        <RegistryValue Root="HKCU" Key="Software\PaneShift\Installer" Name="Path" Value="[INSTALLFOLDER]" Type="string" KeyPath="yes" />
+        <RegistryValue Root="HKCU" Key="Software\PaneShift\Installer" Name="ProductCode" Value="[ProductCode]" Type="string" />
+      </Component>
+    </Directory></Directory></StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder"><Component Id="StartMenuShortcut" Guid="*">
+      <Shortcut Id="StartMenuShortcut" Name="PaneShift" Target="[INSTALLFOLDER]PaneShift.App.exe" WorkingDirectory="INSTALLFOLDER" Icon="PaneShiftIcon" />
+      <RegistryValue Root="HKCU" Key="Software\PaneShift\Installer" Name="Shortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component></StandardDirectory>
+    <Binary Id="InstallerActions" SourceFile="$(var.CustomActions)" />
+    <CustomAction Id="PrepareInstallation" BinaryRef="InstallerActions" DllEntry="Prepare" Execute="immediate" Return="check" />
+    <CustomAction Id="RestoreStartup" BinaryRef="InstallerActions" DllEntry="RestoreStartup" Execute="rollback" Impersonate="yes" TerminalServerAware="yes" Return="check" HideTarget="yes" />
+    <CustomAction Id="RemoveStartup" BinaryRef="InstallerActions" DllEntry="RemoveStartup" Execute="deferred" Impersonate="yes" TerminalServerAware="yes" Return="check" HideTarget="yes" />
+    <CustomAction Id="MigrateLegacy" BinaryRef="InstallerActions" DllEntry="MigrateLegacy" Execute="commit" Impersonate="yes" TerminalServerAware="yes" Return="check" HideTarget="yes" />
+    <Property Id="RestoreStartup" Hidden="yes" /><Property Id="RemoveStartup" Hidden="yes" /><Property Id="MigrateLegacy" Hidden="yes" />
+    <InstallExecuteSequence>
+      <Custom Action="PrepareInstallation" After="CostFinalize" Condition="1" />
+      <Custom Action="RestoreStartup" Before="RemoveStartup" Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="RemoveStartup" Before="RemoveFiles" Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="MigrateLegacy" Before="InstallFinalize" Condition="NOT Installed AND NOT REMOVE AND MigrateLegacy" />
+    </InstallExecuteSequence>
+    <Feature Id="Application" Title="PaneShift" Level="1"><ComponentGroupRef Id="Payload" /><ComponentRef Id="InstallationMarker" /><ComponentRef Id="StartMenuShortcut" /></Feature>
+    <ui:WixUI Id="WixUI_Minimal" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+    <WixVariable Id="WixUIWelcomeEulaDlgDescription" Value="Install PaneShift for your user account. Close any running copy first. After a successful installation, a previous default Inno installation is removed and its startup preference is migrated. Your settings are retained." />
+  </Package>
+</Wix>

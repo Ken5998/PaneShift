@@ -27,6 +27,7 @@ public sealed class SettingsViewModel : ObservableObject
     private string gapText = "0";
     private bool edges;
     private bool macStyleEnabled;
+    private bool automaticUpdates;
     private string feedback = "";
     private string validation = "";
     private string status = "";
@@ -34,6 +35,8 @@ public sealed class SettingsViewModel : ObservableObject
     public ObservableCollection<ShortcutGroup> Groups { get; }
     public RelayCommand ApplyCommand { get; }
     public LoginStartupViewModel? LoginStartup { get; }
+    public UpdateViewModel? Updates { get; }
+    public bool AutomaticUpdates { get => automaticUpdates; set { automaticUpdates = value; Edited(); } }
     public string GapText { get => gapText; set { gapText = value; Edited(); Changed(nameof(GapValue)); } }
     public double GapValue { get => int.TryParse(gapText, out int n) ? Math.Clamp(n, 0, 64) : 0; set => GapText = ((int)value).ToString(CultureInfo.InvariantCulture); }
     public bool ApplyGapToScreenEdges { get => edges; set { edges = value; Edited(); } }
@@ -46,10 +49,11 @@ public sealed class SettingsViewModel : ObservableObject
     public bool CanApply => HasChanges && validation.Length == 0 && !HasExternalChange;
     public string RuntimeStatus { get => status; set { status = value; Changed(); } }
 
-    public SettingsViewModel(PaneShiftSettings current, Func<PaneShiftSettings, string?> apply, LoginStartupViewModel? loginStartup = null)
+    public SettingsViewModel(PaneShiftSettings current, Func<PaneShiftSettings, string?> apply, LoginStartupViewModel? loginStartup = null, UpdateViewModel? updates = null)
     {
         this.apply = apply;
         LoginStartup = loginStartup;
+        Updates = updates;
         baseline = current;
         Rows = ActionCatalog.All.Select(a => new ShortcutRow(a)).ToArray();
         Groups = new(Rows.GroupBy(r => r.Definition.Group).Select(g => new ShortcutGroup(g.Key, g.ToArray())));
@@ -65,6 +69,7 @@ public sealed class SettingsViewModel : ObservableObject
         gapText = settings.GapPixels.ToString(CultureInfo.InvariantCulture);
         edges = settings.ApplyGapToScreenEdges;
         macStyleEnabled = settings.MacStyleShortcuts.Enabled;
+        automaticUpdates = settings.Updates.CheckAutomatically;
         var bindings = HotkeySettings.Resolve(settings);
         foreach (var row in Rows)
         {
@@ -78,7 +83,7 @@ public sealed class SettingsViewModel : ObservableObject
         Refresh();
     }
 
-    private string Fingerprint() => $"{gapText}|{edges}|{macStyleEnabled}|" + string.Join("|", Rows.Select(r => r.Chord ?? "-"));
+    private string Fingerprint() => $"{gapText}|{edges}|{macStyleEnabled}|{automaticUpdates}|" + string.Join("|", Rows.Select(r => r.Chord ?? "-"));
 
     public PaneShiftSettings CreateCandidate()
     {
@@ -87,7 +92,7 @@ public sealed class SettingsViewModel : ObservableObject
         var map = ImmutableSortedDictionary.CreateBuilder<string, string?>(StringComparer.Ordinal);
         foreach (var row in Rows) map[row.Definition.Id] = row.Chord;
         var candidate = baseline with { GapPixels = gap, ApplyGapToScreenEdges = edges, Hotkeys = map.ToImmutable(),
-            MacStyleShortcuts = new() { Enabled = macStyleEnabled } };
+            MacStyleShortcuts = new() { Enabled = macStyleEnabled }, Updates = new() { CheckAutomatically = automaticUpdates } };
         candidate.Validate();
         return candidate;
     }
@@ -105,6 +110,7 @@ public sealed class SettingsViewModel : ObservableObject
         catch (ArgumentException ex) { validation = ex.Message; }
         Changed(nameof(GapText)); Changed(nameof(GapValue)); Changed(nameof(ApplyGapToScreenEdges));
         Changed(nameof(MacStyleEnabled));
+        Changed(nameof(AutomaticUpdates));
         Changed(nameof(HasChanges)); Changed(nameof(HasExternalChange)); Changed(nameof(CanApply));
         Changed(nameof(Validation)); Changed(nameof(Feedback));
         ApplyCommand.Refresh();
@@ -135,7 +141,7 @@ public sealed class SettingsViewModel : ObservableObject
         Edited();
     }
 
-    public void RestoreDefaults() { gapText = "0"; edges = false; macStyleEnabled = false; ResetShortcuts(); }
+    public void RestoreDefaults() { gapText = "0"; edges = false; macStyleEnabled = false; automaticUpdates = false; ResetShortcuts(); }
 
     public void ExternalReload(PaneShiftSettings settings)
     {

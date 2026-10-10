@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <CustomActionPlatform>x64</CustomActionPlatform>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/PaneShift.Windows/InstallerInstanceLock.cs" Link="InstallerInstanceLock.cs" />
+    <Reference Include="Microsoft.CSharp" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="WixToolset.Dtf.CustomAction" Version="6.0.2" />
+    <Content Include="CustomAction.config" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

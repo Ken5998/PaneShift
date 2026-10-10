@@ -12,6 +12,9 @@ Settings are read at startup and on explicit **Reload Settings** from `%LOCALAPP
 {
   "gapPixels": 0,
   "applyGapToScreenEdges": false,
+  "updates": {
+    "checkAutomatically": false
+  },
   "macStyleShortcuts": {
     "enabled": false
   },
@@ -56,3 +59,7 @@ The generic transformation applies to all tiled layouts and repeated half sizes.
 The [fixed mapping table](../README.md#mac-style-shortcuts) is not independently configurable. All twelve mappings become active together; none are intercepted while disabled or paused. Window-management bindings conflicting with the whitelist are rejected before saving when enabled. The hook is prepared before saving and only activated after commit; registration, hook installation or file errors preserve the previous state. Reload follows the same path. A paused Apply probes hook installation but never enables translations and releases it afterward.
 
 Enabling overrides native Win+V/A/S/W and the other listed combinations. Win+W sends Ctrl+W, and Win+Q sends graceful Alt+F4, never process termination. Startup preference remains the separate Windows setting above and is unaffected by this JSON flag or an upgrade.
+
+## Update checks
+
+`updates.checkAutomatically` is a Boolean, default `false`. General edits it with Apply/Cancel; Restore defaults turns it off in the draft, and a valid Reload reschedules the runtime checker. Manual Check now is available regardless of the flag. The 24-hour interval is fixed; no additional JSON setting is needed. Attempt timestamps and the last notified tag are stored separately in `update-check.json` so network checks never rewrite the settings draft. See [Updates](UPDATES.md) for downloads, installation, migration and privacy.

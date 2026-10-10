@@ -133,8 +133,22 @@
                     </StackPanel></Border>
                 </StackPanel></ScrollViewer>
             </TabItem>
-            <TabItem Header="_General">
+            <TabItem x:Name="GeneralTab" Header="_General">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,8,12,0"><StackPanel>
+                    <Border Style="{StaticResource Card}"><StackPanel>
+                        <TextBlock Text="Updates" Style="{StaticResource Heading}"/>
+                        <CheckBox Content="Check for updates _automatically" IsChecked="{Binding AutomaticUpdates}" AutomationProperties.Name="Check for updates automatically"/>
+                        <TextBlock Text="Off by default · Apply to save · checks GitHub at most every 24 hours while PaneShift is running." Foreground="{DynamicResource MutedBrush}" Margin="22,8,0,16"/>
+                        <StackPanel DataContext="{Binding Updates}">
+                            <Button Content="Check now" Command="{Binding CheckCommand}" HorizontalAlignment="Left"/>
+                            <TextBlock Text="{Binding Status}" Margin="0,12,0,8" AutomationProperties.LiveSetting="Polite"/>
+                            <StackPanel Visibility="{Binding HasRelease, Converter={StaticResource BoolVisibility}}">
+                                <WrapPanel><Button Content="Release notes" Command="{Binding ReleasePageCommand}" Margin="0,0,8,8"/><Button Content="{Binding DownloadLabel}" Command="{Binding InstallCommand}" Margin="0,0,0,8"/></WrapPanel>
+                                <Expander Header="What's new" Foreground="{DynamicResource TextBrush}"><TextBlock Text="{Binding ReleaseNotes}" Margin="0,8,0,0" MaxHeight="220"/></Expander>
+                            </StackPanel>
+                        </StackPanel>
+                        <TextBlock Text="Only public stable releases are offered. Downloads are verified with SHA-256. Installation starts when you request it; use a standard PaneShift instance." Foreground="{DynamicResource MutedBrush}" Margin="0,12,0,0"/>
+                    </StackPanel></Border>
                     <Border Style="{StaticResource Card}" DataContext="{Binding LoginStartup}"><StackPanel>
                         <TextBlock Text="Startup" Style="{StaticResource Heading}"/>
                         <CheckBox Content="Start PaneShift when I sign _in" IsChecked="{Binding IsEnabled, Mode=OneWay}" Command="{Binding ToggleCommand}" IsEnabled="{Binding CanChange}" AutomationProperties.Name="Start PaneShift when I sign in"/>

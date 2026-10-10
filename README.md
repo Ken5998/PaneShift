@@ -37,6 +37,7 @@ Arrange windows with configurable shortcuts, precise layouts and adjustable spac
 - Tray pause/resume and explicit administrator restart for elevated windows.
 - Optional start at sign-in, shared between the tray menu and General settings.
 - Optional Mac-style application shortcuts: Win+C/V, tab management and graceful window closing.
+- Optional release checks every 24 hours, manual Check now, and verified updates started by the user.
 
 An independent MIT-licensed implementation inspired by Rectangle's positioning workflow on macOS. No Rectangle code, branding or assets are reused.
 
@@ -44,7 +45,7 @@ An independent MIT-licensed implementation inspired by Rectangle's positioning w
 
 **Requires Windows 11 x64.** Release packages include the .NET runtime; users do not need to install .NET separately.
 
-Download the installer or portable ZIP from the [latest published GitHub release](https://github.com/Ken5998/PaneShift/releases/latest). **PaneShift v0.2.0 is currently a draft**, introducing optional Mac-style shortcuts. Publication is on hold for review of two installer antivirus detections; see the [validation record](docs/VALIDATION_0.2.0.md#release-hold-and-antivirus-investigation). The latest public release remains v0.1.1. See the [0.2.0 release notes](docs/RELEASE_NOTES_0.2.0.md).
+Download the installer or portable ZIP from the [latest published GitHub release](https://github.com/Ken5998/PaneShift/releases/latest). **PaneShift v0.3.0** brings per-user MSI installation, optional Mac-style shortcuts and opt-in release checks. See the [0.3.0 release notes](docs/RELEASE_NOTES_0.3.0.md) and [validation record](docs/VALIDATION_0.3.0.md).
 
 Or install/update from PowerShell without administrator rights:
 
@@ -52,17 +53,25 @@ Or install/update from PowerShell without administrator rights:
 irm https://paneshift.ksmvc.ch/win | iex
 ```
 
-The script downloads the latest published installer from GitHub, verifies it against the release's SHA-256 checksum, closes an installed PaneShift instance when necessary, performs a silent per-user install/update, and launches PaneShift afterward. Use `& ([scriptblock]::Create((irm https://paneshift.ksmvc.ch/win))) -NoLaunch` to leave it closed, or add `-Force` to reinstall the current version. As with every `irm | iex` command, inspect [the script](https://paneshift.ksmvc.ch/win.ps1) first if desired.
+The script downloads the latest published installer from GitHub, verifies it against the release's SHA-256 checksum, waits for you to exit a running PaneShift copy, performs a silent per-user install/update, and launches PaneShift afterward. Use `& ([scriptblock]::Create((irm https://paneshift.ksmvc.ch/win))) -NoLaunch` to leave it closed, or add `-Force` to reinstall the current version. As with every `irm | iex` command, inspect [the script](https://paneshift.ksmvc.ch/win.ps1) first if desired.
 
 | Package | How to use it |
 | --- | --- |
-| `PaneShift-<version>-Setup-x64.exe` | Install for the current user, normally in `%LOCALAPPDATA%\Programs\PaneShift`. Start Menu shortcut is optional; desktop shortcut is unchecked by default. |
+| `PaneShift-0.3.0-Setup-x64.msi` | Per-user Windows Installer package in `%LOCALAPPDATA%\Programs\PaneShift-MSI`. Migrates a previous default Inno installation after the new payload has committed. |
 | `PaneShift-<version>-win-x64.zip` | Extract **all** files into a folder, then run `PaneShift.App.exe`. No installation needed. |
 | `SHA256SUMS.txt` | SHA-256 hashes of the final installer and ZIP. Compare using `Get-FileHash -Algorithm SHA256`. |
 
 Exit a running copy before installing an update or switching between installed and portable builds. A second copy cannot run alongside the first. The portable build uses the same per-user configuration location as the installed build.
 
-Normal installation does not request administrator privileges. Uninstall removes installed application files and shortcuts, while preserving your configuration. Startup at sign-in is off until you enable it in the app; uninstall removes its entry only when it points to that installed copy. An auto-updater is not implemented.
+Normal installation does not request administrator privileges. Uninstall removes installed application files and shortcuts, while preserving your configuration. Startup at sign-in is off until you enable it in the app; uninstall removes its entry only when it points to that installed copy. MSI upgrades preserve this preference. The MSI replaces the historical EXE installer; close PaneShift through the tray's **Exit** command before migrating. Custom-location Inno installations require manual removal before migration; see [MSI migration](docs/UPDATES.md#msi-migration).
+
+## Updates
+
+In **Settings → General → Updates**, enable **Check for updates automatically** and Apply to opt in. It checks GitHub on launch when due and every 24 hours while running. Existing configurations default to off. **Check now** and the tray's **Check for updates...** work independently of the flag. Drafts, prereleases and older versions are not offered.
+
+An available release shows its notes and a **Download and install** button for installed copies. After confirmation, PaneShift downloads the MSI, verifies its size and GitHub SHA-256 digest, exits normally, opens Windows Installer and restarts the installed version after success. Cancellation/failure restarts the previous copy where available. Elevated instances must be reopened normally to update. There are no scheduled tasks, services or unattended installations.
+
+Portable copies offer **Download portable ZIP** instead. The verified ZIP's folder opens; extract into a new folder and exit the old copy before switching. Settings remain shared. Update checks contact GitHub only when requested or enabled, sending no settings, window information or keyboard activity. See [update behavior and privacy](docs/UPDATES.md).
 
 ## Default shortcuts
 
@@ -115,7 +124,7 @@ PaneShift starts in the notification area, possibly inside its overflow menu. Ri
 - **Shortcuts:** select a field, press modifiers and a key, or choose Clear. Escape cancels recording. Duplicates block Apply; reset-to-default changes only the draft.
 - **Layout:** edit the physical-pixel gap, toggle screen-edge gaps and inspect the preview. The slider covers 0–64 px; direct input accepts larger nonnegative values. Cycle sizes is the currently supported repetition mode.
 - **Keyboard:** enable Mac-style shortcuts and review their mappings. Changes follow Apply/Cancel; Restore defaults turns the feature off in the draft.
-- **General:** toggle start at sign-in, check shortcut/privilege status, open the configuration file/folder, restore defaults, open the repository or request administrator restart.
+- **General:** opt in to update checks or check manually, toggle start at sign-in, check shortcut/privilege status, open the configuration file/folder, restore defaults, open the repository or request administrator restart.
 
 **Start PaneShift when I sign in** is available in the tray menu and General. This Windows preference changes immediately in both places, independently of Apply/Cancel and Restore defaults for JSON settings. It registers the current executable for your user account, starts in the tray with standard privileges, and needs no administrator rights. Keep the executable's folder in place, especially for portable builds. If you move it, enable startup from the new copy. The checkbox refers to the current copy; enabling it replaces an older PaneShift location. Windows Startup apps can disable the registration separately. Debug builds and elevated instances cannot edit this preference; use a normal Release instance.
 
@@ -137,7 +146,7 @@ The Settings window uses Windows light/dark application colors when opened; reop
 
 ## Security and code signing
 
-Signing is optional and is not assumed for v0.2.0. SignPath Foundation integration is ready to configure after acceptance. Each release's notes state its actual signing status and link to SHA-256 checksums. See the [code signing policy](docs/CODE_SIGNING.md).
+Code signing is not currently enabled. SignPath Foundation integration is ready to configure after acceptance. Each release's notes state its actual signing status and link to SHA-256 checksums. See the [code signing policy](docs/CODE_SIGNING.md).
 
 Optional VirusTotal reports refer to the final downloadable files. Public VirusTotal submissions are public samples; reports are informational and false positives are possible. There is no fixed-hash VirusTotal badge or unverified clean-scan claim.
 
@@ -160,21 +169,22 @@ dotnet test PaneShift.sln -c Release --no-build
 dotnet run --project src/PaneShift.App
 ```
 
-To produce the self-contained ZIP, Inno Setup installer and checksums:
+To produce the self-contained ZIP, per-user MSI and checksums:
 
 ```powershell
-$iscc = ./scripts/Install-InnoSetup.ps1
-./scripts/Build-Release.ps1 -IsccPath $iscc
+./scripts/Build-Release.ps1
 ```
 
-Use PowerShell 7. The helper installs a verified, pinned Inno Setup compiler under ignored `artifacts/tools`. If already installed, pass your compiler path instead. See [release instructions](docs/RELEASING.md) for versioning, artifacts, signing and GitHub draft releases.
+Use PowerShell 7. MSI builds use pinned WiX 6.0.2 from NuGet under ignored `artifacts/tools`; installer custom actions target the .NET Framework already included in Windows 11. Historical versions through 0.2.0 retain the Inno build path and `-IsccPath` parameter. See [release instructions](docs/RELEASING.md) for versioning, artifacts, signing and GitHub draft releases.
+
+The earlier isolated [MSI packaging trial](docs/MSI_TRIAL.md) records the packaging evaluation that preceded the production MSI. Its v0.2.0 trial package is not the current installer.
 
 ## Architecture
 
 | Project | Responsibility |
 | --- | --- |
 | `PaneShift.Core` | Pure physical-pixel geometry, settings/chord models, validation, persistence and repetition state |
-| `PaneShift.Windows` | Win32/DWM positioning, transactional hotkeys, optional shortcut translation, privilege detection and restart handoff |
+| `PaneShift.Windows` | Win32/DWM positioning, transactional hotkeys, optional shortcut translation, verified release downloads and installer/restart handoff |
 | `PaneShift.App` | WPF lifecycle and Settings; Windows Forms only for the tray icon/menu |
 | `PaneShift.Core.Tests` / `PaneShift.Windows.Tests` | Geometry, settings, transactional rollback, draft state and Windows-support logic |
 

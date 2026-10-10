@@ -21,6 +21,12 @@ function Get-PublishDirectory([string] $Version) {
     return Join-Path $ArtifactsRoot "portable/PaneShift-$Version-win-x64"
 }
 
+function Get-InstallerFileName([string] $Version) {
+    $Version = Get-ReleaseVersion $Version
+    $extension = if ([version](($Version -split '[-+]')[0]) -ge [version]'0.3.0') { 'msi' } else { 'exe' }
+    return "PaneShift-$Version-Setup-x64.$extension"
+}
+
 function Reset-ArtifactDirectory([string] $Path) {
     $full = [IO.Path]::GetFullPath($Path)
     $root = [IO.Path]::GetFullPath($ArtifactsRoot)

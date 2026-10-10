@@ -42,6 +42,7 @@ public partial class SettingsWindow : Window
     }
 
     public void CloseForExit() { discardOnClose = true; Close(); }
+    public void ShowUpdates() => GeneralTab.IsSelected = true;
     private void OnClosing(object? sender, CancelEventArgs e) { if (!discardOnClose) e.Cancel = !ConfirmPendingChanges(); }
     private void Cancel(object sender, RoutedEventArgs e) { discardOnClose = true; Close(); }
     private void ResetShortcuts(object sender, RoutedEventArgs e) => ViewModel.ResetShortcuts();

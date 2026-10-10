@@ -4,7 +4,8 @@ param([Parameter(Mandatory)][string] $Version, [Parameter(Mandatory)][string] $R
 $Version = Get-ReleaseVersion $Version
 if ($Repository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { throw 'Invalid GitHub repository.' }
 $directory = Join-Path $ArtifactsRoot 'release'
-$expectedNames = @("PaneShift-$Version-Setup-x64.exe", "PaneShift-$Version-win-x64.zip")
+$installerName = Get-InstallerFileName $Version
+$expectedNames = @($installerName, "PaneShift-$Version-win-x64.zip")
 $checksums = @(Get-Content (Join-Path $directory 'SHA256SUMS.txt'))
 if ($checksums.Count -ne 2) { throw 'Expected exactly two release checksums.' }
 foreach ($name in $expectedNames) {
@@ -20,7 +21,7 @@ $notes = @"
 
 ## Downloads
 
-- [Installer]($base/PaneShift-$Version-Setup-x64.exe) — installs for the current user.
+- [Installer]($base/$installerName) — installs for the current user.
 - [Portable ZIP]($base/PaneShift-$Version-win-x64.zip) — extract the entire directory, then run PaneShift.App.exe.
 
 ## Security

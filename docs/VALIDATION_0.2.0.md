@@ -62,6 +62,8 @@ The existing release mechanism, installer and window geometry were reused withou
 
 ## Release hold and antivirus investigation
 
+An isolated [MSI packaging trial](MSI_TRIAL.md) was subsequently built and tested on 2026-10-10. Local install/repair/uninstall checks passed, and the maintainer confirmed laptop installation without UAC or blocks, preservation of preferences, Mac-style enable/disable behavior and successful return to the existing v0.1.1 installation. VirusTotal reported 0/59 detections for that separate MSI; DeepInstinct could not process the file type. This does not resolve the original installer classification or constitute an in-place migration or permission to publish the held release. The linked record contains the exact trial hash, scope and remaining acceptance work.
+
 The maintainer explicitly chose to keep v0.2.0 as a draft pending investigation. The latest public release remains v0.1.1; the v0.2.0 tag and verified assets have not been replaced or rebuilt.
 
 The [report-only refresh](https://github.com/Ken5998/PaneShift/actions/runs/36734743485) completed successfully. At review time (2026-09-30), the installer had **2 malicious / 0 suspicious** results and the ZIP **0 malicious / 0 suspicious**. The public installer detection page identified **Microsoft: Trojan:Win32/Wacatac.B!ml** and **DeepInstinct: MALICIOUS**, 2/67 vendors. These are unresolved detections, not confirmed false positives.

@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
+using System.Windows.Threading;
 using System.Windows.Interop;
 using PaneShift.Core;
 using PaneShift.Windows;
@@ -20,6 +22,8 @@ public partial class App : System.Windows.Application
     private LoginStartupViewModel? loginStartup;
     private Mutex? instance;
     private bool ownsMutex;
+    private Mutex? installerInstance;
+    private bool ownsInstallerMutex;
     private HwndSource? source;
     private GlobalHotkeys? hotkeys;
     private MacStyleShortcutService? macStyle;
@@ -34,12 +38,28 @@ public partial class App : System.Windows.Application
     private string? lastCommandFailure;
     private string? restartDiagnostic;
     private bool restartInProgress;
+    private ReleaseClient? releaseClient;
+    private UpdateViewModel? updates;
+    private DispatcherTimer? updateTimer;
 
     public App() => windows = new WindowService(runtime);
 
-    protected override void OnStartup(System.Windows.StartupEventArgs e)
+    protected override async void OnStartup(System.Windows.StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (e.Args.Length > 0 && e.Args[0] == "--install-update")
+        {
+            try
+            {
+                if (e.Args.Length != 2) throw new ArgumentException("Invalid update helper arguments.");
+                string? result = await UpdateInstaller.RunHelperAsync(e.Args[1]);
+                if (result is not null) System.Windows.MessageBox.Show(result, "PaneShift — Update");
+                Shutdown();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or Win32Exception or InvalidOperationException or System.Text.Json.JsonException)
+            { System.Windows.MessageBox.Show("The update could not be completed. Open PaneShift from Start and try again.", "PaneShift — Update"); Shutdown(1); }
+            return;
+        }
         RestartRequest? restart;
         try
         {
@@ -61,6 +81,12 @@ public partial class App : System.Windows.Application
             instance = new Mutex(false, @"Local\PaneShift");
             try { ownsMutex = instance.WaitOne(0); }
             catch (AbandonedMutexException) { ownsMutex = true; }
+            if (ownsMutex)
+            {
+                installerInstance = new Mutex(false, InstallerInstanceLock.CurrentUserName);
+                try { ownsInstallerMutex = installerInstance.WaitOne(0); }
+                catch (AbandonedMutexException) { ownsInstallerMutex = true; }
+            }
         }
         catch (UnauthorizedAccessException)
         {
@@ -70,7 +96,7 @@ public partial class App : System.Windows.Application
             Shutdown(1);
             return;
         }
-        if (!ownsMutex)
+        if (!ownsMutex || !ownsInstallerMutex)
         {
             System.Windows.MessageBox.Show("PaneShift is already running in the notification area.", "PaneShift");
             Shutdown();
@@ -93,6 +119,14 @@ public partial class App : System.Windows.Application
             var loaded = settingsStore.LoadOrCreate();
             settingsWarning = loaded.Warning;
             runtime.ReplaceCurrent(loaded.Settings);
+            releaseClient = new ReleaseClient();
+            var currentVersion = ReleaseUpdates.StableVersion(typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('-')[0].Split('+')[0]);
+            updates = new UpdateViewModel(releaseClient, currentVersion,
+                new UpdateCheckStore(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PaneShift", "update-check.json")),
+                release => tray?.ShowBalloonTip(6000, "PaneShift — Update available", $"Version {release.Version} is available. Open Settings → General → Updates.", Forms.ToolTipIcon.Info),
+                uri => OpenPath(uri.AbsoluteUri), DownloadUpdateAsync, PaneShiftInstallation.IsInstalled(AppContext.BaseDirectory));
+            updateTimer = new DispatcherTimer();
+            updateTimer.Tick += async (_, _) => { updateTimer.Stop(); await CheckUpdatesAsync(true); };
             source = new HwndSource(new HwndSourceParameters("PaneShift.Hotkeys")
             {
                 ParentWindow = new nint(-3), // HWND_MESSAGE: no visible or focusable window.
@@ -109,6 +143,7 @@ public partial class App : System.Windows.Application
             menu.Items.Add("Shortcuts and status", null, (_, _) => ShowStatus());
             menu.Items.Add("Open Settings File", null, (_, _) => OpenSettingsFile());
             menu.Items.Add("Reload Settings", null, (_, _) => ReloadSettings());
+            menu.Items.Add("Check for updates...", null, async (_, _) => { OpenSettings(); settingsWindow?.ShowUpdates(); await CheckUpdatesAsync(false); });
             menu.Items.Add(new Forms.ToolStripSeparator());
             var pause = new Forms.ToolStripMenuItem("Pause shortcuts") { CheckOnClick = true, Checked = paused };
             pause.Click += (_, _) =>
@@ -155,6 +190,7 @@ public partial class App : System.Windows.Application
             if (!paused) RegisterShortcuts();
             if (settingsWarning is not null) Notify(settingsWarning);
             if (applicationIcon.Warning is not null) Notify(applicationIcon.Warning);
+            ScheduleUpdateCheck();
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
         {
@@ -264,6 +300,7 @@ public partial class App : System.Windows.Application
         failures = [];
         macStyleWarning = null;
         settingsWindow?.ViewModel.ExternalReload(runtime.Current);
+        ScheduleUpdateCheck();
         RefreshSettingsStatus();
         tray?.ShowBalloonTip(4000, "PaneShift — Settings reloaded", DescribeSettings(), Forms.ToolTipIcon.Info);
     }
@@ -273,7 +310,7 @@ public partial class App : System.Windows.Application
         if (settingsWindow is null)
         {
             loginStartup?.Refresh();
-            var model = new SettingsViewModel(runtime.Current, ApplySettings, loginStartup);
+            var model = new SettingsViewModel(runtime.Current, ApplySettings, loginStartup, updates);
             settingsWindow = new SettingsWindow(model, applicationIcon!.WindowIcon, settingsStore!.FilePath, isElevated,
                 () => OpenPath(settingsStore.FilePath), () => OpenPath(Path.GetDirectoryName(settingsStore.FilePath)!),
                 () => OpenPath("https://github.com/Ken5998/PaneShift"), RestartAsAdministrator);
@@ -289,7 +326,7 @@ public partial class App : System.Windows.Application
     private string? ApplySettings(PaneShiftSettings candidate)
     {
         var error = activation!.Apply(candidate, persist: true, paused);
-        if (error is null) { settingsWarning = null; macStyleWarning = null; failures = []; }
+        if (error is null) { settingsWarning = null; macStyleWarning = null; failures = []; ScheduleUpdateCheck(); }
         RefreshSettingsStatus();
         return error;
     }
@@ -307,6 +344,49 @@ public partial class App : System.Windows.Application
     private void ExitFromTray()
     {
         if (settingsWindow?.ConfirmPendingChanges() == false) return;
+        settingsWindow?.CloseForExit();
+        Shutdown();
+    }
+
+    private void ScheduleUpdateCheck()
+    {
+        updateTimer?.Stop();
+        if (updates is null || updateTimer is null) return;
+        updates.Configure(runtime.Current.Updates.CheckAutomatically);
+        if (!runtime.Current.Updates.CheckAutomatically) { updates.CancelAutomaticCheck(); return; }
+        if (ReleaseUpdates.IsDue(DateTimeOffset.UtcNow, updates.State.LastAttempt)) _ = CheckUpdatesAsync(true);
+        else ArmUpdateTimer();
+    }
+
+    private void ArmUpdateTimer()
+    {
+        if (updates is null || updateTimer is null || !runtime.Current.Updates.CheckAutomatically) return;
+        var remaining = (updates.State.LastAttempt ?? DateTimeOffset.UtcNow) + ReleaseUpdates.CheckInterval - DateTimeOffset.UtcNow;
+        updateTimer.Interval = remaining > TimeSpan.Zero ? remaining : ReleaseUpdates.CheckInterval;
+        updateTimer.Start();
+    }
+
+    private async Task CheckUpdatesAsync(bool automatic)
+    {
+        if (updates is null) return;
+        await updates.CheckAsync(automatic);
+        ArmUpdateTimer();
+    }
+
+    private async Task DownloadUpdateAsync(AvailableRelease release, CancellationToken token)
+    {
+        bool installed = PaneShiftInstallation.IsInstalled(AppContext.BaseDirectory);
+        if (installed && isElevated != false) throw new InvalidOperationException("Update from a standard PaneShift instance.");
+        var asset = installed ? release.Installer ?? throw new IOException("This release has no MSI. Use the release page.") : release.Portable;
+        if (System.Windows.MessageBox.Show(settingsWindow,
+            installed ? $"Download and verify PaneShift {release.Version}, then close PaneShift and open its installer?" : $"Download and verify the portable ZIP for PaneShift {release.Version}? Extract it into a new folder and close this copy before switching.",
+            "PaneShift — Update", System.Windows.MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Question) != System.Windows.MessageBoxResult.OK)
+            throw new OperationCanceledException();
+        string directory = UpdateInstaller.CreateDownloadDirectory();
+        string downloaded = await releaseClient!.DownloadAsync(asset, directory, token);
+        if (!installed) { OpenPath(directory); return; }
+        if (settingsWindow?.ConfirmPendingChanges() == false) throw new OperationCanceledException();
+        UpdateInstaller.StartHelper(downloaded, asset, release.Version, AppContext.BaseDirectory);
         settingsWindow?.CloseForExit();
         Shutdown();
     }
@@ -358,12 +438,17 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(System.Windows.ExitEventArgs e)
     {
+        updateTimer?.Stop();
+        updates?.Dispose();
+        releaseClient?.Dispose();
         macStyle?.Dispose();
         hotkeys?.Dispose();
         if (source is not null) { source.RemoveHook(OnMessage); source.Dispose(); }
         tray?.Dispose();
         applicationIcon?.Dispose();
         menu?.Dispose();
+        if (ownsInstallerMutex) installerInstance?.ReleaseMutex();
+        installerInstance?.Dispose();
         if (ownsMutex) instance?.ReleaseMutex();
         instance?.Dispose();
         base.OnExit(e);

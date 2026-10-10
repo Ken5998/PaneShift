@@ -1,18 +1,20 @@
 # Building and publishing a release
 
+From **0.3.0**, the existing pipeline produces a per-user MSI using pinned WiX 6.0.2 and the portable ZIP. Run `./scripts/Build-Release.ps1`; `Build-Msi.ps1` compiles the isolated installer custom actions and uses shared payload authoring, then `Verify-Msi.ps1` validates metadata, scope, payload count and action scheduling. Stable three-part versions are required for MSI, with major/minor at most 255. See [MSI migration/update acceptance](UPDATES.md#acceptance). Historical versions through 0.2.0 retain the Inno path and EXE filenames. Neither format conversion nor a local build modifies an existing tag or release.
+
 ## Version and build tools
 
-`Directory.Build.props` is the single local version source (currently `0.2.0`). A tagged release uses its validated `v<SemVer>` tag to pass `-p:Version=<SemVer>` through build/publish. Assembly/FileVersion use the three numeric components plus `.0`; ProductVersion and Settings show the complete semantic version. Numeric components must fit Windows metadata (0–65534). The manifest's fixed assembly identity is a loader identity, not the product version; its asInvoker, uiAccess and Per-Monitor V2 settings remain unchanged.
+`Directory.Build.props` is the single local version source (currently `0.3.0`). A tagged release uses its validated `v<SemVer>` tag to pass `-p:Version=<SemVer>` through build/publish. Assembly/FileVersion use the three numeric components plus `.0`; ProductVersion and Settings show the complete semantic version. Numeric components must fit Windows metadata (0–65534). The manifest's fixed assembly identity is a loader identity, not the product version; its asInvoker, uiAccess and Per-Monitor V2 settings remain unchanged.
 
 For every release, update the version, README, website feature descriptions and download references, and add `docs/RELEASE_NOTES_<version>.md` with `## Highlights` and `## Downloads` sections. The draft script includes that version's highlights automatically. Preserve historical release notes and screenshot version captions. Public download links should point to `/releases/latest` until version-specific assets are published and verified; never advertise a draft as available. Run the application tests, release-script checks and site build before committing and pushing.
 
-Use Windows 11 x64, PowerShell 7, .NET 10 SDK, and Inno Setup 6.7 or newer. GitHub-hosted `windows-2025` runners build CI and releases. Action revisions are pinned; review dependency updates deliberately. The runtime patch comes from the installed .NET SDK, so rebuild releases when runtime security servicing requires it.
+Use Windows 11 x64, PowerShell 7 and the .NET 10 SDK. Production MSI uses WiX 6.0.2 from NuGet; the historical Inno path needs Inno Setup 6.7 or newer. GitHub-hosted `windows-2025` runners build CI and releases. Action revisions are pinned; review dependency updates deliberately. The runtime patch comes from the installed .NET SDK, so rebuild releases when runtime security servicing requires it.
 
-No Inno compiler installed? Run:
+For a historical release through 0.2.0 without an Inno compiler, run:
 
 ```powershell
 $iscc = ./scripts/Install-InnoSetup.ps1
-./scripts/Build-Release.ps1 -IsccPath $iscc
+./scripts/Build-Release.ps1 -Version 0.2.0 -IsccPath $iscc
 ```
 
 The optional helper downloads Inno Setup 6.7.3 from the official GitHub release, verifies its pinned SHA-256 and trusted Pyrsys B.V. Authenticode publisher, then installs the build tool per-user under ignored `artifacts/tools/InnoSetup`. It does not elevate. The hash is taken from the upstream release's asset digest. Follow [upstream verification guidance](https://jrsoftware.org/isdl-verify.php) when updating it. Inno Setup has separate licensing terms; consult those terms for commercial use.
@@ -20,7 +22,7 @@ The optional helper downloads Inno Setup 6.7.3 from the official GitHub release,
 With your own compiler:
 
 ```powershell
-./scripts/Build-Release.ps1 -IsccPath 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+./scripts/Build-Release.ps1 -Version 0.2.0 -IsccPath 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
 ```
 
 `Build-Release.ps1` restores, builds, runs all tests, publishes, packages, verifies and hashes. Each native command is checked for failure. Close the running application before rebuilding its output files or testing another copy.
@@ -34,10 +36,10 @@ WPF and native runtime files are shipped beside the executable, including requir
 ```text
 artifacts/
   portable/
-    PaneShift-0.2.0-win-x64/          # complete publish directory
-    PaneShift-0.2.0-win-x64.zip
+    PaneShift-0.3.0-win-x64/          # complete publish directory
+    PaneShift-0.3.0-win-x64.zip
   installer/
-    PaneShift-0.2.0-Setup-x64.exe
+    PaneShift-0.3.0-Setup-x64.msi
   SHA256SUMS.txt
 ```
 
@@ -45,7 +47,7 @@ The ZIP puts `PaneShift.App.exe` at its root. It includes the runtime and LICENS
 
 Publish cleans only the selected version directory under artifacts, after path/junction checks. Build from a clean checkout for official releases. `Verify-Release.ps1` checks x64, metadata, self-contained dependencies, unwanted files, installer version and each ZIP entry against the publish directory before writing SHA256SUMS.txt. Hashes cover the final installer and ZIP, not source archives or intermediate artifacts.
 
-## Installer behavior
+## Historical Inno installer behavior (through 0.2.0)
 
 `installer/PaneShift.iss` defines a stable AppId for upgrades and uses `PrivilegesRequired=lowest` with `%LOCALAPPDATA%\Programs\PaneShift` as default. It requires Windows 11 or later (build 22000+) and x64-compatible Windows. The first supported/tested target is Windows 11 x64; ARM64 emulation has not been accepted as a supported target.
 
@@ -60,7 +62,9 @@ Publish cleans only the selected version directory under artifacts, after path/j
 
 ## CI and release workflow
 
-`ci.yml` runs on pull requests and pushes to main. It restores, builds and tests Release, validates release scripts, and verifies an unsigned production publish. No signing secrets or public releases are involved.
+The isolated [MSI packaging trial](MSI_TRIAL.md) remains historical evidence with separate identity. Production MSI uses `installer/PaneShift.wxs`, its own UpgradeCode and explicit migration/startup actions. Its running-app preflight uses `Global\PaneShift-<user SID>` so the installer service can observe the app across sessions, plus an exact executable-path check for older default Inno copies. No process is forcibly closed. Run the complete [acceptance matrix](UPDATES.md#acceptance) for the production package; the trial's hash/scan is not transferable to it.
+
+`ci.yml` runs on pull requests and pushes to main. It restores, builds and tests Release, validates release scripts, and packages and verifies the unsigned production MSI and ZIP. No signing secrets or public releases are involved.
 
 `release.yml` runs on `v*` tags and rejects invalid SemVer before packaging. The read-only package job builds/tests, publishes, optionally signs the app, builds ZIP/installer, optionally signs the installer, and verifies final files/checksums. Only a dependent release job has repository write permission. It verifies downloaded hashes, creates a **draft** with the three public assets, then optionally submits those files to VirusTotal and updates the draft notes. Failed builds/tests/packaging cannot create a release.
 
@@ -69,8 +73,8 @@ The draft remains unpublished for maintainer acceptance; publish it from GitHub 
 No release/tag is created by local build scripts. To prepare the next remote release after review and commit:
 
 ```powershell
-git tag -a v0.2.0 -m 'PaneShift v0.2.0'
-git push origin v0.2.0
+git tag -a v0.3.0 -m 'PaneShift v0.3.0'
+git push origin v0.3.0
 ```
 
 Tag permissions should be restricted to maintainers. Configure SignPath and optional VirusTotal secrets only as described in [CODE_SIGNING.md](CODE_SIGNING.md). No IDs or credentials are pre-filled. Signing requires explicit opt-in; an unsigned draft is permitted and labeled accurately.
@@ -80,9 +84,9 @@ Tag permissions should be restricted to maintainers. Configure SignPath and opti
 Use a clean Windows 11 x64 VM without .NET installed for the final no-prerequisites check. Preserve a copy/hash of any existing settings before switching builds.
 
 1. Build/test and run `scripts/Test-ReleaseScripts.ps1`; inspect final hashes and metadata.
-2. Extract the ZIP into a new empty directory away from the source/build tree. Launch its EXE; verify one tray icon, branded Settings, version 0.2.0 and no SDK/runtime prompt.
+2. Extract the ZIP into a new empty directory away from the source/build tree. Launch its EXE; verify one tray icon, branded Settings, version 0.3.0 and no SDK/runtime prompt.
 3. Check shortcuts, layout gaps and settings persistence across exit/relaunch; also run the [application regression checklist](TESTING.md).
-4. Exit the portable copy. Install using a standard account, verify default per-user directory and no elevation prompt. Check Start Menu selected by default, desktop unselected, and optional launch.
+4. Exit the portable copy. Install using a standard account, verify default per-user directory and no elevation prompt. Check Start Menu shortcut targets the MSI directory; launch manually from Start.
 5. Verify the installed tray icon, Settings, shortcuts, persistence and standard privilege status.
 6. Start at login: confirm installation alone adds no Run entry. Enable it in General; verify the tray checkbox and the quoted Run value match. Disable it from the tray and verify General refreshes. Repeat enabling/disabling, then sign out/in to confirm standard tray-only launch. If Windows Startup apps disables it, re-enable it there. No Startup shortcut, service or task should be added.
 7. Request administrator restart and manually accept/cancel UAC; verify single-instance handoff and settings path. Close the elevated process afterward.

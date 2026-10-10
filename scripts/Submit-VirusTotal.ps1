@@ -44,7 +44,7 @@ function Invoke-VirusTotal([string] $Uri, [string] $Method = 'Get', [IO.FileInfo
     }
 }
 $results = [Collections.Generic.List[object]]::new()
-foreach ($name in @("PaneShift-$Version-Setup-x64.exe", "PaneShift-$Version-win-x64.zip")) {
+foreach ($name in @((Get-InstallerFileName $Version), "PaneShift-$Version-win-x64.zip")) {
     $stage = 'artifact validation'
     try {
         $file = Get-Item -LiteralPath (Join-Path $directory $name)

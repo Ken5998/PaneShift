@@ -34,6 +34,10 @@ $rejected = $false
 try { Reset-ArtifactDirectory $RepoRoot } catch { $rejected = $true }
 if (-not $rejected) { throw 'Unsafe artifact cleanup was accepted.' }
 Write-Host "Release script syntax, $($valid.Count + $invalid.Count) version cases, and cleanup boundary passed."
+foreach ($case in @(@('0.1.1', 'exe'), @('0.2.0', 'exe'), @('0.3.0', 'msi'), @('1.0.0', 'msi'))) {
+    if ((Get-InstallerFileName $case[0]) -cne "PaneShift-$($case[0])-Setup-x64.$($case[1])") { throw 'Installer format selection failed.' }
+}
+Write-Host 'Historical EXE and current MSI artifact names passed.'
 . "$PSScriptRoot/VirusTotal.Multipart.ps1"
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('paneshift-multipart-' + [Guid]::NewGuid().ToString('N') + '.bin')
 try {

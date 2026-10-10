@@ -29,3 +29,7 @@ jobs:
         run: ./scripts/Test-ReleaseScripts.ps1
       - name: Verify unsigned production publish
         run: ./scripts/Publish-Release.ps1
+      - name: Build and verify production MSI and ZIP
+        run: |
+          ./scripts/Package-Release.ps1
+          ./scripts/Verify-Release.ps1
