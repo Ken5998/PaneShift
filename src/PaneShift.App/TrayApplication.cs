@@ -150,7 +150,7 @@ public partial class App : System.Windows.Application
             {
                 paused = pause.Checked;
                 windows.ResetRepetition();
-                if (paused) { hotkeys?.ReleaseAll(); macStyle?.Commit(false); }
+                if (paused) { hotkeys?.ReleaseAll(); macStyle?.Commit(KeyboardShortcutConfiguration.Disabled); }
                 else RegisterShortcuts();
                 if (tray is not null) tray.Text = paused ? "PaneShift — paused" : "PaneShift";
                 RefreshSettingsStatus();
@@ -201,9 +201,11 @@ public partial class App : System.Windows.Application
 
     private void RegisterShortcuts()
     {
-        failures = hotkeys!.Register(HotkeySettings.Resolve(runtime.Current));
-        macStyleWarning = macStyle!.Prepare(runtime.Current.MacStyleShortcuts.Enabled);
-        if (macStyleWarning is null) macStyle.Commit(runtime.Current.MacStyleShortcuts.Enabled);
+        var configuration = KeyboardShortcutConfiguration.From(runtime.Current);
+        macStyleWarning = macStyle!.Prepare(configuration);
+        // A startup hook failure must not remove the legacy window shortcuts too.
+        failures = hotkeys!.Register(macStyleWarning is null ? configuration.NativeBindings : HotkeySettings.Resolve(runtime.Current));
+        if (macStyleWarning is null) macStyle.Commit(configuration);
         else Notify(macStyleWarning);
         if (failures.Count > 0)
             Notify($"{failures.Count} shortcut(s) could not be registered. Open Shortcuts and status for details.");
@@ -218,8 +220,15 @@ public partial class App : System.Windows.Application
             Notify(lastCommandFailure);
             return 0;
         }
-        if (message != GlobalHotkeys.HotkeyMessage || paused || hotkeys is null ||
-            !hotkeys.TryGetBinding((int)wParam, out var binding) || binding is null) return 0;
+        if (paused || hotkeys is null) return 0;
+        HotkeyBinding? binding;
+        if (message == MacStyleShortcutService.WindowShortcutMessage)
+        {
+            handled = true;
+            if (macStyle?.TryGetWindowBinding(wParam, lParam, out binding) != true) return 0;
+        }
+        else if (message != GlobalHotkeys.HotkeyMessage || !hotkeys.TryGetBinding((int)wParam, out binding)) return 0;
+        if (binding is null) return 0;
         handled = true;
         if (settingsWindow?.TryRecordHotkey(binding) == true) return 0;
         var action = binding.Action;
@@ -248,6 +257,8 @@ public partial class App : System.Windows.Application
         if (macStyleWarning is not null) text += "\n\n" + macStyleWarning;
         if (runtime.Current.MacStyleShortcuts.Enabled)
             text += "\n\nMac-style shortcuts:\n" + string.Join("\n", MacStyleShortcuts.All.Select(m => $"{m.SourceDisplay} → {m.TargetDisplay} — {m.Name}"));
+        if (runtime.Current.Keyboard.RightAltGAtSign)
+            text += "\n\nSwiss keyboard: Right Alt + G → @. AltGr is excluded from PaneShift's Ctrl+Alt window shortcuts.";
         if (hotkeys?.CleanupWarning is { } cleanup) text += "\n\n" + cleanup;
         if (privilegeWarning is not null) text += "\n\n" + privilegeWarning;
         if (lastCommandFailure is not null) text += "\n\nLast window command failure:\n" + lastCommandFailure;

@@ -27,6 +27,7 @@ public sealed class SettingsViewModel : ObservableObject
     private string gapText = "0";
     private bool edges;
     private bool macStyleEnabled;
+    private bool rightAltGAtSign;
     private bool automaticUpdates;
     private string feedback = "";
     private string validation = "";
@@ -41,6 +42,7 @@ public sealed class SettingsViewModel : ObservableObject
     public double GapValue { get => int.TryParse(gapText, out int n) ? Math.Clamp(n, 0, 64) : 0; set => GapText = ((int)value).ToString(CultureInfo.InvariantCulture); }
     public bool ApplyGapToScreenEdges { get => edges; set { edges = value; Edited(); } }
     public bool MacStyleEnabled { get => macStyleEnabled; set { macStyleEnabled = value; Edited(); } }
+    public bool RightAltGAtSign { get => rightAltGAtSign; set { rightAltGAtSign = value; Edited(); } }
     public IReadOnlyList<ShortcutTranslation> MacStyleMappings => MacStyleShortcuts.All;
     public string Validation => validation;
     public string Feedback => feedback;
@@ -69,6 +71,7 @@ public sealed class SettingsViewModel : ObservableObject
         gapText = settings.GapPixels.ToString(CultureInfo.InvariantCulture);
         edges = settings.ApplyGapToScreenEdges;
         macStyleEnabled = settings.MacStyleShortcuts.Enabled;
+        rightAltGAtSign = settings.Keyboard.RightAltGAtSign;
         automaticUpdates = settings.Updates.CheckAutomatically;
         var bindings = HotkeySettings.Resolve(settings);
         foreach (var row in Rows)
@@ -83,7 +86,7 @@ public sealed class SettingsViewModel : ObservableObject
         Refresh();
     }
 
-    private string Fingerprint() => $"{gapText}|{edges}|{macStyleEnabled}|{automaticUpdates}|" + string.Join("|", Rows.Select(r => r.Chord ?? "-"));
+    private string Fingerprint() => $"{gapText}|{edges}|{macStyleEnabled}|{rightAltGAtSign}|{automaticUpdates}|" + string.Join("|", Rows.Select(r => r.Chord ?? "-"));
 
     public PaneShiftSettings CreateCandidate()
     {
@@ -92,7 +95,8 @@ public sealed class SettingsViewModel : ObservableObject
         var map = ImmutableSortedDictionary.CreateBuilder<string, string?>(StringComparer.Ordinal);
         foreach (var row in Rows) map[row.Definition.Id] = row.Chord;
         var candidate = baseline with { GapPixels = gap, ApplyGapToScreenEdges = edges, Hotkeys = map.ToImmutable(),
-            MacStyleShortcuts = new() { Enabled = macStyleEnabled }, Updates = new() { CheckAutomatically = automaticUpdates } };
+            MacStyleShortcuts = new() { Enabled = macStyleEnabled }, Keyboard = new() { RightAltGAtSign = rightAltGAtSign },
+            Updates = new() { CheckAutomatically = automaticUpdates } };
         candidate.Validate();
         return candidate;
     }
@@ -110,6 +114,7 @@ public sealed class SettingsViewModel : ObservableObject
         catch (ArgumentException ex) { validation = ex.Message; }
         Changed(nameof(GapText)); Changed(nameof(GapValue)); Changed(nameof(ApplyGapToScreenEdges));
         Changed(nameof(MacStyleEnabled));
+        Changed(nameof(RightAltGAtSign));
         Changed(nameof(AutomaticUpdates));
         Changed(nameof(HasChanges)); Changed(nameof(HasExternalChange)); Changed(nameof(CanApply));
         Changed(nameof(Validation)); Changed(nameof(Feedback));
@@ -141,7 +146,7 @@ public sealed class SettingsViewModel : ObservableObject
         Edited();
     }
 
-    public void RestoreDefaults() { gapText = "0"; edges = false; macStyleEnabled = false; automaticUpdates = false; ResetShortcuts(); }
+    public void RestoreDefaults() { gapText = "0"; edges = false; macStyleEnabled = false; rightAltGAtSign = false; automaticUpdates = false; ResetShortcuts(); }
 
     public void ExternalReload(PaneShiftSettings settings)
     {

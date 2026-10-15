@@ -113,6 +113,12 @@
             <TabItem Header="_Keyboard">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,8,12,0"><StackPanel>
                     <Border Style="{StaticResource Card}"><StackPanel>
+                        <TextBlock Text="Swiss keyboard" Style="{StaticResource Heading}"/>
+                        <CheckBox Content="Write @ with _Right Alt + G (AltGr)" IsChecked="{Binding RightAltGAtSign}"/>
+                        <TextBlock Text="For users accustomed to Swiss Mac keyboards. Changes take effect when you Apply. Off by default; independent of Mac-style shortcuts." Foreground="{DynamicResource MutedBrush}" Margin="22,8,0,12"/>
+                        <TextBlock Text="When enabled, Right Alt + G writes @. Ctrl + Left Alt keeps your window shortcuts; other AltGr combinations keep their native characters, including € and dead keys."/>
+                    </StackPanel></Border>
+                    <Border Style="{StaticResource Card}"><StackPanel>
                         <TextBlock Text="Mac-style shortcuts" Style="{StaticResource Heading}"/>
                         <TextBlock Text="Use the Windows key like Command on macOS for common application shortcuts." Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,16"/>
                         <CheckBox Content="_Enable Mac-style shortcuts" IsChecked="{Binding MacStyleEnabled}"/>

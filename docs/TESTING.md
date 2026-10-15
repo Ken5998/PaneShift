@@ -86,3 +86,32 @@ Record actual manual results per release; automated state/sequence tests are not
 ## Updates and MSI (v0.3.0)
 
 Run the [update/MSI acceptance matrix](UPDATES.md#acceptance), including old-config opt-out, manual checks, offline errors, no automatic installation, verified download failures, installed helper handoff/cancellation/relaunch, portable extraction, Inno migration and MSI upgrade/startup/uninstall preservation. Record direct observations separately from mocks and do not reuse a trial-package scan for the production MSI.
+
+## Swiss Right Alt + G (development)
+
+Use physical keys and disposable text. Check with the Italian (Switzerland)
+Windows layout and Swiss French physical keyboard; record other layouts separately.
+
+1. Old JSON loads with the new option off. In Keyboard, toggle without Apply,
+   Cancel and reopen; behavior and the file must be unchanged. Restore defaults
+   disables only the draft until Apply. Win-key Mac-style remains independent.
+2. Enable and Apply. Right Alt+G types @ in an editor and browser, without moving
+   the window. Release all keys, then type letters, spaces, arrows and Esc, and
+   use Ctrl+C/V. **Esc must not open Start; no modifier may remain active.**
+3. Repeat @ several times. Hold G: one @. Keep Right Alt held, release/repress G:
+   each new G produces @. Release G before AltGr and AltGr before G. Continue
+   normal typing after each sequence; no menu, selection or shortcut artifacts.
+4. Try AltGr+E and other layout characters, including dead-key composition and
+   Shift+AltGr combinations. Native behavior must be preserved. Ctrl+Left Alt+G
+   must retain the right-third window action and its normal cycling. Check the
+   other Ctrl+Alt layouts, including arrows, and native non-Ctrl+Alt bindings.
+5. Check option off/on, pause/resume, Reload, app exit/restart and Apply while
+   paused. Disable must restore native window registrations. A native conflict
+   when restoring a binding or an invalid/disk-failed Apply must retain the old
+   active snapshot. Another utility's hook precedence is not guaranteed.
+6. With each combination of Swiss and Win-key flags, check Win+C/V/T/W/Q,
+   unrelated native keys, light/dark UI, minimum size and 100/125/150% DPI. Check
+   elevated apps via the existing explicit administrator restart and pause for
+   incompatible games. Do not interpret mock tests as application acceptance.
+
+See [current evidence and the modifier-state correction](KEYBOARD_ALTGR.md).

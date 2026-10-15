@@ -18,6 +18,9 @@ Settings are read at startup and on explicit **Reload Settings** from `%LOCALAPP
   "macStyleShortcuts": {
     "enabled": false
   },
+  "keyboard": {
+    "rightAltGAtSign": false
+  },
   "repeatedCommands": {
     "halfActions": "cycleSizes"
   }
@@ -59,6 +62,14 @@ The generic transformation applies to all tiled layouts and repeated half sizes.
 The [fixed mapping table](../README.md#mac-style-shortcuts) is not independently configurable. All twelve mappings become active together; none are intercepted while disabled or paused. Window-management bindings conflicting with the whitelist are rejected before saving when enabled. The hook is prepared before saving and only activated after commit; registration, hook installation or file errors preserve the previous state. Reload follows the same path. A paused Apply probes hook installation but never enables translations and releases it afterward.
 
 Enabling overrides native Win+V/A/S/W and the other listed combinations. Win+W sends Ctrl+W, and Win+Q sends graceful Alt+F4, never process termination. Startup preference remains the separate Windows setting above and is unaffected by this JSON flag or an upgrade.
+
+## Swiss keyboard and AltGr
+
+`keyboard.rightAltGAtSign` is a Boolean, default `false`. Missing section/property keeps the feature off without rewriting existing files. A null/non-object section or non-Boolean property is invalid and preserves the working configuration on Reload. **Settings → Keyboard → Swiss keyboard** edits the flag using Apply/Cancel. Restore defaults turns it off in the draft; resetting window shortcuts alone leaves it unchanged. It does not enable or disable `macStyleShortcuts.enabled`, update checks or startup.
+
+When enabled, Right Alt+G writes @ using Unicode input. Left Alt with Ctrl continues to invoke the configured window actions; Right Alt is excluded from those actions so native AltGr text is preserved. Only Ctrl+Alt window chords change routing from RegisterHotKey to the shared optional input filter. Other bindings retain native registration, and disabling restores the complete native window map. Hook-only chords cannot provide RegisterHotKey's exclusive reservation/conflict detection against other utilities. Failed native registration, hook preparation or save retains the previous routing, active hook options and file. While paused the candidate is prepared but no shortcut is active.
+
+See [architecture, input-state handling and physical-key validation](KEYBOARD_ALTGR.md). No keyboard-layout migration, application text monitoring or clipboard access is introduced.
 
 ## Update checks
 

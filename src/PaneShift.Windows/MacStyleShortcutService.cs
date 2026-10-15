@@ -8,23 +8,33 @@ namespace PaneShift.Windows;
 public sealed class MacStyleShortcutService(nint statusWindow) : IMacStyleShortcutService, IDisposable
 {
     public const int InputFailedMessage = 0x8001;
+    public const int WindowShortcutMessage = 0x8002;
     private HookSession? session;
     private bool enabled;
+    private int generation;
 
-    public string? Prepare(bool requested)
+    public string? Prepare(KeyboardShortcutConfiguration configuration)
     {
-        if (!requested || session is not null) return null;
+        if (!configuration.NeedsHook || session is not null) return null;
         session = new HookSession(statusWindow);
         if (session.StartError is not { } error) return null;
         session.Dispose(); session = null;
-        return $"Mac-style shortcuts could not be enabled. {error}";
+        return $"Keyboard shortcuts could not be enabled. {error}";
     }
 
-    public void Commit(bool requested)
+    public void Commit(KeyboardShortcutConfiguration configuration)
     {
-        enabled = requested;
-        if (session is not null) session.Active = requested;
-        if (!requested) Rollback();
+        enabled = configuration.NeedsHook;
+        if (session is not null) session.State = new(configuration, Interlocked.Increment(ref generation));
+        if (!enabled) Rollback();
+    }
+
+    public bool TryGetWindowBinding(nint action, nint token, out HotkeyBinding? binding)
+    {
+        var state = session?.State;
+        binding = state is not null && state.Generation == token && state.Configuration.RightAltGAtSign
+            ? state.Configuration.HookWindowBindings.FirstOrDefault(b => (nint)b.Action == action) : null;
+        return binding is not null;
     }
 
     public void Rollback()
@@ -33,7 +43,9 @@ public sealed class MacStyleShortcutService(nint statusWindow) : IMacStyleShortc
         session?.Dispose(); session = null;
     }
 
-    public void Dispose() => Commit(false);
+    public void Dispose() => Commit(KeyboardShortcutConfiguration.Disabled);
+
+    private sealed record HookState(KeyboardShortcutConfiguration Configuration, int Generation);
 
     private sealed class HookSession : IDisposable
     {
@@ -41,12 +53,13 @@ public sealed class MacStyleShortcutService(nint statusWindow) : IMacStyleShortc
         private readonly ManualResetEventSlim ready = new();
         private readonly nint statusWindow;
         private readonly ShortcutTranslationFilter filter = new();
+        private readonly AltGrShortcutFilter altGr = new();
         private readonly NativeInput backend = new();
         private readonly ShortcutInputSender sender;
         private readonly KeyboardNative.HookProc callback;
         private uint threadId;
         private nint hook;
-        public volatile bool Active;
+        public volatile HookState State = new(KeyboardShortcutConfiguration.Disabled, 0);
         public string? StartError { get; private set; }
 
         public HookSession(nint statusWindow)
@@ -80,7 +93,8 @@ public sealed class MacStyleShortcutService(nint statusWindow) : IMacStyleShortc
 
         private nint OnKeyboard(int code, nuint message, nint data)
         {
-            if (code >= 0 && Active)
+            var state = State;
+            if (code >= 0 && state.Configuration.NeedsHook)
             {
                 var input = Marshal.PtrToStructure<KeyboardNative.KeyboardEvent>(data);
                 if ((input.Flags & 0x12) == 0) // Ignore all injected input, including our tagged SendInput.
@@ -90,8 +104,14 @@ public sealed class MacStyleShortcutService(nint statusWindow) : IMacStyleShortc
                     if (backend.IsDown(0x10)) modifiers |= HotkeyModifiers.Shift;
                     if (backend.IsDown(0x11)) modifiers |= HotkeyModifiers.Control;
                     if (backend.IsDown(0x12)) modifiers |= HotkeyModifiers.Alt;
-                    if (filter.Process(input.Key, (input.Flags & 0x80) != 0, false, modifiers, Send,
-                        backend.IsDown((ushort)input.Key))) return 1;
+                    bool up = (input.Flags & 0x80) != 0;
+                    bool down = backend.IsDown((ushort)input.Key);
+                    if (altGr.Process(input.Key, up, false, modifiers, backend.IsDown(0xA5), backend.IsDown(0xA4),
+                        backend.IsDown(0xA3), state.Configuration,
+                        () => Report(sender.SendAtSign()),
+                        binding => PostWindowCommand(binding, state), down)) return 1;
+                    if (filter.Process(input.Key, up, false, modifiers, Send, down,
+                        state.Configuration.MacStyleEnabled)) return 1;
                 }
             }
             return KeyboardNative.CallNextHookEx(0, code, message, data);
@@ -99,14 +119,25 @@ public sealed class MacStyleShortcutService(nint statusWindow) : IMacStyleShortc
 
         private bool Send(ShortcutTranslation translation)
         {
-            bool success = sender.Send(translation);
+            return Report(sender.Send(translation));
+        }
+
+        private void PostWindowCommand(HotkeyBinding binding, HookState state)
+        {
+            // The source key is consumed, so suppress a bare Alt/Win menu gesture too.
+            sender.MaskMenu();
+            KeyboardNative.PostMessage(statusWindow, WindowShortcutMessage, (nuint)binding.Action, state.Generation);
+        }
+
+        private bool Report(bool success)
+        {
             if (!success) KeyboardNative.PostMessage(statusWindow, InputFailedMessage, 0, 0);
             return success;
         }
 
         public void Dispose()
         {
-            Active = false;
+            State = new(KeyboardShortcutConfiguration.Disabled, 0);
             if (thread.IsAlive)
             {
                 KeyboardNative.PostThreadMessage(threadId, 0x0012, 0, 0);
@@ -126,7 +157,8 @@ public sealed class MacStyleShortcutService(nint statusWindow) : IMacStyleShortc
                 Type = 1,
                 Data = new KeyboardNative.InputUnion { Keyboard = new()
                 {
-                    Key = i.Key, Flags = (i.Up ? 2u : 0u) | (i.Key is 0x5B or 0x5C ? 1u : 0u),
+                    Key = i.Unicode ? (ushort)0 : i.Key, Scan = i.Unicode ? i.Key : (ushort)0,
+                    Flags = (i.Up ? 2u : 0u) | (i.Unicode ? 4u : i.Key is 0x5B or 0x5C or 0xA3 or 0xA5 ? 1u : 0u),
                     ExtraInfo = 0x504E5348
                 } }
             }).ToArray();

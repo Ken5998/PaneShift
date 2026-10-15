@@ -22,13 +22,19 @@ Before the first modification, the service saves original geometry and native pl
 
 ## Mac-style shortcut translation
 
+The optional Swiss Right Alt+G feature shares this input service. Its immutable
+`KeyboardShortcutConfiguration` also routes configured Ctrl+Alt window bindings
+through the hook while excluding Right Alt, preserving native AltGr characters.
+Without that option, window commands continue using RegisterHotKey as described
+below. See [Swiss keyboard routing, Unicode and validation](KEYBOARD_ALTGR.md).
+
 Core owns the immutable `MacStyleShortcutSettings` (off by default), fixed `ShortcutTranslation` catalog, and cross-validation against configured window hotkeys. App adds a Keyboard tab to the existing draft view model; no Win32 code enters WPF view code. The existing window action bindings, repetition and geometry are unchanged.
 
 ### Why an optional hook is necessary
 
 A native RegisterHotKey probe on the development Windows desktop (2026-09-30) attempted every source chord with MOD_NOREPEAT, releasing successful registrations immediately. Eleven failed with error 1409 (already registered), including Win+C/V/X/A/Z/S/F/T/W/Q and Win+Shift+T; only Win+Shift+Z succeeded. Therefore RegisterHotKey cannot reliably supply the complete override. Microsoft documents [Win-key combinations as reserved for the OS](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerhotkey). Splitting the whitelist across both mechanisms would complicate semantics without removing the need for a hook.
 
-`MacStyleShortcutService` installs WH_KEYBOARD_LL only for the opted-in feature, on a dedicated message-pump thread. It does not inject a DLL, poll, call application UI from the callback, or block on file/network I/O. Window commands retain the existing RegisterHotKey subsystem. The callback passes unrelated keys, extra modifiers and all injected events onward; it consumes only whitelist down/repeat/up events. An outstanding-key bitset prevents auto-repeat and orphan source key-ups, even if Win is released first. No text, key history or activity log is retained. Injected events are excluded before matching to prevent recursion. Windows may remove a hook that exceeds its timeout, so keeping the callback independent of WPF dialogs/file saves matters; see [LowLevelKeyboardProc](https://learn.microsoft.com/en-us/windows/win32/winmsg/lowlevelkeyboardproc).
+`MacStyleShortcutService` installs WH_KEYBOARD_LL only while either keyboard option is enabled, on a dedicated message-pump thread. It does not inject a DLL, poll, call application UI from the callback, or block on file/network I/O. Default window commands retain the existing RegisterHotKey subsystem; the Swiss option selectively routes Ctrl+Alt chords as described above. The callback passes unrelated keys, extra modifiers and all injected events onward; it consumes only matched down/repeat/up events. An outstanding-key bitset prevents auto-repeat and orphan source key-ups, even if Win is released first. No text, key history or activity log is retained. Injected events are excluded before matching to prevent recursion. Windows may remove a hook that exceeds its timeout, so keeping the callback independent of WPF dialogs/file saves matters; see [LowLevelKeyboardProc](https://learn.microsoft.com/en-us/windows/win32/winmsg/lowlevelkeyboardproc).
 
 `ConfigurationActivation` prepares an inactive hook alongside native registrations. After successful atomic file save and runtime commit it activates the entire whitelist. Failed hook installation, registration or save releases only preparation and preserves existing execution. Disabling, pause and disposal turn off interception and stop the hook thread. Paused Apply validates installation without activating input. Internal source conflicts are rejected before touching either layer. Startup/resume retain partial success for legacy window registrations; the translation whitelist is all-or-none. Third-party hook precedence cannot be reliably reserved or diagnosed like RegisterHotKey conflicts.
 

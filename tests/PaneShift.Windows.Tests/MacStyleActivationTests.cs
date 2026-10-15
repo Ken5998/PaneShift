@@ -10,8 +10,9 @@ public sealed class MacStyleActivationTests : IDisposable
     private sealed class Layer : IMacStyleShortcutService
     {
         public bool Active, Prepared, Fail;
-        public string? Prepare(bool enabled) { Prepared = enabled; return Fail && enabled ? "Hook unavailable" : null; }
-        public void Commit(bool enabled) { Active = enabled; Prepared = false; }
+        public KeyboardShortcutConfiguration Configuration = KeyboardShortcutConfiguration.Disabled;
+        public string? Prepare(KeyboardShortcutConfiguration configuration) { Prepared = configuration.NeedsHook; return Fail && Prepared ? "Hook unavailable" : null; }
+        public void Commit(KeyboardShortcutConfiguration configuration) { Configuration = configuration; Active = configuration.NeedsHook; Prepared = false; }
         public void Rollback() => Prepared = false;
     }
     private sealed class Backend : IHotkeyBackend
@@ -96,6 +97,59 @@ public sealed class MacStyleActivationTests : IDisposable
         model.ExternalReload(new() { MacStyleShortcuts = new() { Enabled = true } });
         Assert.True(model.MacStyleEnabled);
         Assert.False(model.HasChanges);
+    }
+
+    [Theory]
+    [InlineData(false)][InlineData(true)]
+    public void AtSignEnableDisableReenableReloadAndPauseAreTransactional(bool macEnabled)
+    {
+        var runtime = new RuntimeSettings(); var backend = new Backend(); var layer = new Layer();
+        using var hotkeys = new GlobalHotkeys(backend);
+        var store = new SettingsStore(Path.Combine(directory, "settings.json"));
+        var activation = new ConfigurationActivation(runtime, store, hotkeys, layer);
+        foreach (bool atSign in new[] { false, true, false, true })
+        {
+            var candidate = new PaneShiftSettings { Keyboard = new() { RightAltGAtSign = atSign }, MacStyleShortcuts = new() { Enabled = macEnabled } };
+            Assert.Null(activation.Apply(candidate, true, false));
+            Assert.Equal(atSign, layer.Configuration.RightAltGAtSign);
+            Assert.Equal(macEnabled, layer.Configuration.MacStyleEnabled);
+            Assert.Equal(atSign ? 2 : 18, backend.Held.Count);
+            Assert.Equal(18, backend.Held.Count + layer.Configuration.HookWindowBindings.Count);
+            Assert.True(store.LoadCandidate().Settings!.Keyboard.RightAltGAtSign == atSign);
+        }
+        Assert.Null(activation.Apply(runtime.Current, false, true));
+        Assert.False(layer.Active); Assert.Empty(backend.Held);
+        Assert.True(runtime.Current.Keyboard.RightAltGAtSign);
+        Assert.Null(activation.Reload(false));
+        Assert.True(layer.Configuration.RightAltGAtSign);
+        Assert.Equal(macEnabled, layer.Configuration.MacStyleEnabled);
+        Assert.Equal(2, backend.Held.Count);
+    }
+
+    [Theory]
+    [InlineData("hook", false)][InlineData("registration", false)][InlineData("disk", false)]
+    [InlineData("registration", true)][InlineData("disk", true)]
+    public void AtSignFailureRetainsPreviousRoutingHookAndFile(string failure, bool previous)
+    {
+        var runtime = new RuntimeSettings(); var backend = new Backend(); var layer = new Layer();
+        using var hotkeys = new GlobalHotkeys(backend);
+        var store = new SettingsStore(Path.Combine(directory, "settings.json"));
+        var activation = new ConfigurationActivation(runtime, store, hotkeys, layer);
+        Assert.Null(activation.Apply(new() { Keyboard = new() { RightAltGAtSign = previous } }, true, false));
+        var before = backend.Held.ToArray();
+        var oldConfiguration = layer.Configuration;
+        string original = File.ReadAllText(store.FilePath);
+        if (failure == "hook") layer.Fail = true;
+        if (failure == "registration") backend.Conflict = HotkeyChord.Parse("Ctrl+Win+B");
+        if (failure == "disk") activation = new(runtime, new SettingsStore(directory), hotkeys, layer);
+        var candidate = new PaneShiftSettings { Keyboard = new() { RightAltGAtSign = !previous },
+            Hotkeys = ImmutableSortedDictionary<string, string?>.Empty.Add("center", "Ctrl+Win+B") };
+        Assert.NotNull(activation.Apply(candidate, true, false));
+        Assert.Equal(previous, runtime.Current.Keyboard.RightAltGAtSign);
+        Assert.Same(oldConfiguration, layer.Configuration);
+        Assert.Equal(before, backend.Held.ToArray());
+        Assert.Equal(original, File.ReadAllText(store.FilePath));
+        Assert.False(layer.Prepared);
     }
 
     public void Dispose() { if (Directory.Exists(directory)) Directory.Delete(directory, true); }

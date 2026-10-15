@@ -11,14 +11,16 @@ public sealed class ConfigurationActivation(RuntimeSettings runtime, SettingsSto
         try
         {
             candidate.Validate();
-            var bindings = HotkeySettings.Resolve(candidate);
-            var error = macStyle?.Prepare(candidate.MacStyleShortcuts.Enabled);
+            var configuration = KeyboardShortcutConfiguration.From(candidate);
+            var error = macStyle?.Prepare(configuration);
             if (error is not null) return error;
-            return hotkeys.Transition(bindings, () =>
+            if (configuration.NeedsHook && macStyle is null)
+                return "Keyboard shortcuts could not be enabled: input service unavailable.";
+            return hotkeys.Transition(configuration.NativeBindings, () =>
             {
                 if (persist) store.Save(candidate);
                 runtime.ReplaceCurrent(candidate);
-                macStyle?.Commit(candidate.MacStyleShortcuts.Enabled && !paused);
+                macStyle?.Commit(paused ? KeyboardShortcutConfiguration.Disabled : configuration);
             });
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)

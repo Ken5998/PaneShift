@@ -37,6 +37,7 @@ Arrange windows with configurable shortcuts, precise layouts and adjustable spac
 - Tray pause/resume and explicit administrator restart for elevated windows.
 - Optional start at sign-in, shared between the tray menu and General settings.
 - Optional Mac-style application shortcuts: Win+C/V, tab management and graceful window closing.
+- Optional Swiss keyboard support: Right Alt/AltGr+G writes @ while other AltGr characters keep their native behavior.
 - Optional release checks every 24 hours, manual Check now, and verified updates started by the user.
 
 An independent MIT-licensed implementation inspired by Rectangle's positioning workflow on macOS. No Rectangle code, branding or assets are reused.
@@ -92,6 +93,14 @@ The following use **Ctrl + Alt**:
 
 Release each chord before repeating it. Repeated halves cycle sizes on the same target. Thirds and two-thirds move through the horizontal positions; sixths stay in their top or bottom row. Another action, another target, pause or a failed command resets the sequence. Restore keeps the window's original placement for the current PaneShift session.
 
+## Swiss keyboard and AltGr
+
+In **Settings → Keyboard → Swiss keyboard**, enable **Write @ with Right Alt + G (AltGr)** and **Apply**. This is for users accustomed to Swiss Mac keyboards, including a Swiss French physical keyboard with the Italian (Switzerland) Windows layout. The option is off by default and independent of the Win-key Mac-style feature.
+
+Right Alt+G inserts `@`. **Ctrl+Left Alt+G** keeps the right-third window shortcut. Other AltGr combinations retain their native layout behavior, including € and dead keys. PaneShift does not change the Windows keyboard layout. Holding G does not repeat the command; release and press G again for another @, including while Right Alt stays held.
+
+Windows can represent AltGr as Left Ctrl+Right Alt. While this option is active, PaneShift routes its configured Ctrl+Alt window shortcuts through the existing optional keyboard filter, excluding Right Alt; the remaining window shortcuts still use RegisterHotKey. Disabling the option restores their normal registration. Pause, Cancel, Restore defaults and Reload follow the existing settings rules. Other keyboard utilities, games and elevated targets can affect compatibility; see [implementation and validation](docs/KEYBOARD_ALTGR.md).
+
 ## Mac-style shortcuts
 
 In **Settings → Keyboard**, select **Enable Mac-style shortcuts**, then **Apply**. Use the Windows key like Command on macOS for these application shortcuts. The feature is **off by default**, including upgrades from older settings files.
@@ -123,7 +132,7 @@ PaneShift starts in the notification area, possibly inside its overflow menu. Ri
 
 - **Shortcuts:** select a field, press modifiers and a key, or choose Clear. Escape cancels recording. Duplicates block Apply; reset-to-default changes only the draft.
 - **Layout:** edit the physical-pixel gap, toggle screen-edge gaps and inspect the preview. The slider covers 0–64 px; direct input accepts larger nonnegative values. Cycle sizes is the currently supported repetition mode.
-- **Keyboard:** enable Mac-style shortcuts and review their mappings. Changes follow Apply/Cancel; Restore defaults turns the feature off in the draft.
+- **Keyboard:** optionally enable Right Alt+G for @, or Mac-style Win shortcuts, and review their behavior. Changes follow Apply/Cancel; Restore defaults turns both options off in the draft.
 - **General:** opt in to update checks or check manually, toggle start at sign-in, check shortcut/privilege status, open the configuration file/folder, restore defaults, open the repository or request administrator restart.
 
 **Start PaneShift when I sign in** is available in the tray menu and General. This Windows preference changes immediately in both places, independently of Apply/Cancel and Restore defaults for JSON settings. It registers the current executable for your user account, starts in the tray with standard privileges, and needs no administrator rights. Keep the executable's folder in place, especially for portable builds. If you move it, enable startup from the new copy. The checkbox refers to the current copy; enabling it replaces an older PaneShift location. Windows Startup apps can disable the registration separately. Debug builds and elevated instances cannot edit this preference; use a normal Release instance.
@@ -152,7 +161,7 @@ Optional VirusTotal reports refer to the final downloadable files. Public VirusT
 
 PaneShift does not transmit user information during window management or shortcut translation. The repository button opens GitHub in your browser. No telemetry, key logging, DLL injection, service, driver or process-memory manipulation is used. Typed text and keyboard activity are never recorded or transmitted.
 
-Window-management shortcuts still use `RegisterHotKey`. Only when Mac-style shortcuts are enabled, a small global low-level keyboard hook intercepts the exact whitelist and sends balanced `SendInput` chords. Windows reserves these combinations, so `RegisterHotKey` alone cannot override them. The hook ignores injected events, uses a dedicated message thread, and is removed on disable, pause or exit. It does no background polling. See the [implementation and privacy notes](docs/ARCHITECTURE.md#mac-style-shortcut-translation).
+Default window-management shortcuts use `RegisterHotKey`. Enabling Mac-style Win shortcuts or Swiss Right Alt+G installs a small low-level keyboard hook on a dedicated message thread. The Win feature intercepts its exact whitelist; the Swiss option sends @ as Unicode and handles configured Ctrl+Alt window chords with Left Alt so AltGr is not stolen. It never releases or represses Ctrl/Alt to insert @. The hook ignores injected events and is removed when neither option is active, or on pause/exit. It does no background polling or typed-text buffering. See the [implementation and privacy notes](docs/ARCHITECTURE.md#mac-style-shortcut-translation).
 
 PaneShift runs normally with standard privileges. To control elevated windows, explicitly choose **Restart as administrator...** and respond to Windows UAC. Cancelling keeps the current instance running. To return to standard privileges, Exit and launch from a standard Explorer session. Elevation does not guarantee access to every protected window.
 
