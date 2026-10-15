@@ -87,7 +87,7 @@ Record actual manual results per release; automated state/sequence tests are not
 
 Run the [update/MSI acceptance matrix](UPDATES.md#acceptance), including old-config opt-out, manual checks, offline errors, no automatic installation, verified download failures, installed helper handoff/cancellation/relaunch, portable extraction, Inno migration and MSI upgrade/startup/uninstall preservation. Record direct observations separately from mocks and do not reuse a trial-package scan for the production MSI.
 
-## Swiss Right Alt + G (development)
+## Swiss Right Alt + G (v0.4.0)
 
 Use physical keys and disposable text. Check with the Italian (Switzerland)
 Windows layout and Swiss French physical keyboard; record other layouts separately.
