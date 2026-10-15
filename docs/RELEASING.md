@@ -4,7 +4,7 @@ From **0.3.0**, the existing pipeline produces a per-user MSI using pinned WiX 6
 
 ## Version and build tools
 
-`Directory.Build.props` is the single local version source (currently `0.3.0`). A tagged release uses its validated `v<SemVer>` tag to pass `-p:Version=<SemVer>` through build/publish. Assembly/FileVersion use the three numeric components plus `.0`; ProductVersion and Settings show the complete semantic version. Numeric components must fit Windows metadata (0–65534). The manifest's fixed assembly identity is a loader identity, not the product version; its asInvoker, uiAccess and Per-Monitor V2 settings remain unchanged.
+`Directory.Build.props` is the single local version source (currently `0.4.0`). A tagged release uses its validated `v<SemVer>` tag to pass `-p:Version=<SemVer>` through build/publish. Assembly/FileVersion use the three numeric components plus `.0`; ProductVersion and Settings show the complete semantic version. Numeric components must fit Windows metadata (0–65534). The manifest's fixed assembly identity is a loader identity, not the product version; its asInvoker, uiAccess and Per-Monitor V2 settings remain unchanged.
 
 For every release, update the version, README, website feature descriptions and download references, and add `docs/RELEASE_NOTES_<version>.md` with `## Highlights` and `## Downloads` sections. The draft script includes that version's highlights automatically. Preserve historical release notes and screenshot version captions. Public download links should point to `/releases/latest` until version-specific assets are published and verified; never advertise a draft as available. Run the application tests, release-script checks and site build before committing and pushing.
 
@@ -36,10 +36,10 @@ WPF and native runtime files are shipped beside the executable, including requir
 ```text
 artifacts/
   portable/
-    PaneShift-0.3.0-win-x64/          # complete publish directory
-    PaneShift-0.3.0-win-x64.zip
+    PaneShift-0.4.0-win-x64/          # complete publish directory
+    PaneShift-0.4.0-win-x64.zip
   installer/
-    PaneShift-0.3.0-Setup-x64.msi
+    PaneShift-0.4.0-Setup-x64.msi
   SHA256SUMS.txt
 ```
 
@@ -73,8 +73,8 @@ The draft remains unpublished for maintainer acceptance; publish it from GitHub 
 No release/tag is created by local build scripts. To prepare the next remote release after review and commit:
 
 ```powershell
-git tag -a v0.3.0 -m 'PaneShift v0.3.0'
-git push origin v0.3.0
+git tag -a v0.4.0 -m 'PaneShift v0.4.0'
+git push origin v0.4.0
 ```
 
 Tag permissions should be restricted to maintainers. Configure SignPath and optional VirusTotal secrets only as described in [CODE_SIGNING.md](CODE_SIGNING.md). No IDs or credentials are pre-filled. Signing requires explicit opt-in; an unsigned draft is permitted and labeled accurately.
@@ -84,7 +84,7 @@ Tag permissions should be restricted to maintainers. Configure SignPath and opti
 Use a clean Windows 11 x64 VM without .NET installed for the final no-prerequisites check. Preserve a copy/hash of any existing settings before switching builds.
 
 1. Build/test and run `scripts/Test-ReleaseScripts.ps1`; inspect final hashes and metadata.
-2. Extract the ZIP into a new empty directory away from the source/build tree. Launch its EXE; verify one tray icon, branded Settings, version 0.3.0 and no SDK/runtime prompt.
+2. Extract the ZIP into a new empty directory away from the source/build tree. Launch its EXE; verify one tray icon, branded Settings, version 0.4.0 and no SDK/runtime prompt.
 3. Check shortcuts, layout gaps and settings persistence across exit/relaunch; also run the [application regression checklist](TESTING.md).
 4. Exit the portable copy. Install using a standard account, verify default per-user directory and no elevation prompt. Check Start Menu shortcut targets the MSI directory; launch manually from Start.
 5. Verify the installed tray icon, Settings, shortcuts, persistence and standard privilege status.

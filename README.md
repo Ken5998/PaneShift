@@ -46,7 +46,7 @@ An independent MIT-licensed implementation inspired by Rectangle's positioning w
 
 **Requires Windows 11 x64.** Release packages include the .NET runtime; users do not need to install .NET separately.
 
-Download the installer or portable ZIP from the [latest published GitHub release](https://github.com/Ken5998/PaneShift/releases/latest). **PaneShift v0.3.0** brings per-user MSI installation, optional Mac-style shortcuts and opt-in release checks. See the [0.3.0 release notes](docs/RELEASE_NOTES_0.3.0.md) and [validation record](docs/VALIDATION_0.3.0.md).
+Download the installer or portable ZIP from the [latest published GitHub release](https://github.com/Ken5998/PaneShift/releases/latest). **PaneShift v0.4.0** adds optional Swiss keyboard support: Right Alt/AltGr+G writes @ without interfering with other AltGr characters. Per-user MSI installation, Mac-style shortcuts and opt-in release checks remain available. See the [0.4.0 release notes](docs/RELEASE_NOTES_0.4.0.md) and [validation record](docs/VALIDATION_0.4.0.md).
 
 Or install/update from PowerShell without administrator rights:
 
@@ -58,7 +58,7 @@ The script downloads the latest published installer from GitHub, verifies it aga
 
 | Package | How to use it |
 | --- | --- |
-| `PaneShift-0.3.0-Setup-x64.msi` | Per-user Windows Installer package in `%LOCALAPPDATA%\Programs\PaneShift-MSI`. Migrates a previous default Inno installation after the new payload has committed. |
+| `PaneShift-0.4.0-Setup-x64.msi` | Per-user Windows Installer package in `%LOCALAPPDATA%\Programs\PaneShift-MSI`. Migrates a previous default Inno installation after the new payload has committed. |
 | `PaneShift-<version>-win-x64.zip` | Extract **all** files into a folder, then run `PaneShift.App.exe`. No installation needed. |
 | `SHA256SUMS.txt` | SHA-256 hashes of the final installer and ZIP. Compare using `Get-FileHash -Algorithm SHA256`. |
 

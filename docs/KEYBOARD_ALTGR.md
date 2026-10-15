@@ -1,6 +1,6 @@
 # Swiss keyboard: Right Alt + G
 
-This feature is in development, not yet a published release. In Settings →
+Introduced in PaneShift v0.4.0. In Settings →
 Keyboard, enable **Write @ with Right Alt + G (AltGr)** and Apply. The JSON
 setting is `keyboard.rightAltGAtSign`, default false. Win-key Mac-style shortcuts
 remain independently configurable. Existing files load without rewriting.
